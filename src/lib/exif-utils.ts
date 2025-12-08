@@ -1,5 +1,3 @@
-import EXIF from 'exif-js';
-
 export interface PhotoMetadata {
   id: string;
   file: File;
@@ -43,7 +41,6 @@ function convertDMSToDD(dms: number[], direction: string): number {
 
 function parseExifDate(dateStr: string): Date | undefined {
   if (!dateStr) return undefined;
-  // EXIF format: "2024:01:15 14:30:00"
   const parts = dateStr.split(' ');
   if (parts.length >= 1) {
     const datePart = parts[0].replace(/:/g, '-');
@@ -55,123 +52,275 @@ function parseExifDate(dateStr: string): Date | undefined {
   return undefined;
 }
 
-export function extractMetadata(file: File): Promise<PhotoMetadata> {
+// Read EXIF from file binary directly
+async function readExifFromFile(file: File): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
+    const reader = new FileReader();
     
-    const createBasicMetadata = (): PhotoMetadata => ({
-      id: crypto.randomUUID(),
-      file,
-      url,
-      name: file.name,
-      size: file.size,
-      width: img.naturalWidth || undefined,
-      height: img.naturalHeight || undefined,
-    });
-
-    const timeoutId = setTimeout(() => {
-      console.log('EXIF extraction timeout for:', file.name);
-      resolve(createBasicMetadata());
-    }, 5000);
-
-    img.onload = () => {
-      try {
-        EXIF.getData(img as unknown as HTMLImageElement, function (this: HTMLImageElement & { exifdata?: Record<string, unknown> }) {
-          clearTimeout(timeoutId);
-          
-          try {
-            const allTags = EXIF.getAllTags(this);
-            console.log('EXIF tags for', file.name, ':', allTags);
-            
-            let latitude: number | undefined;
-            let longitude: number | undefined;
-            let altitude: number | undefined;
-            
-            // Extract GPS coordinates
-            if (allTags.GPSLatitude && allTags.GPSLongitude) {
-              const latRef = allTags.GPSLatitudeRef || 'N';
-              const lonRef = allTags.GPSLongitudeRef || 'E';
-              
-              latitude = convertDMSToDD(allTags.GPSLatitude as number[], latRef as string);
-              longitude = convertDMSToDD(allTags.GPSLongitude as number[], lonRef as string);
-              
-              console.log('GPS found:', latitude, longitude);
-            }
-            
-            // Extract altitude
-            if (allTags.GPSAltitude !== undefined) {
-              const altValue = allTags.GPSAltitude as number;
-              const altRef = (allTags.GPSAltitudeRef as number) || 0;
-              altitude = altRef === 1 ? -altValue : altValue;
-              console.log('Altitude found:', altitude);
-            }
-            
-            // Parse shutter speed
-            let shutterSpeed: string | undefined;
-            if (allTags.ExposureTime) {
-              const expTime = allTags.ExposureTime as number;
-              if (expTime < 1) {
-                shutterSpeed = `1/${Math.round(1 / expTime)}s`;
-              } else {
-                shutterSpeed = `${expTime}s`;
-              }
-            }
-            
-            // Parse aperture
-            let aperture: string | undefined;
-            if (allTags.FNumber) {
-              const fNum = allTags.FNumber as number;
-              aperture = `f/${fNum.toFixed(1)}`;
-            }
-            
-            const metadata: PhotoMetadata = {
-              id: crypto.randomUUID(),
-              file,
-              url,
-              name: file.name,
-              size: file.size,
-              dateCreated: parseExifDate(allTags.DateTimeOriginal as string || allTags.DateTime as string || ''),
-              latitude,
-              longitude,
-              altitude,
-              camera: allTags.Make ? `${allTags.Make} ${allTags.Model || ''}`.trim() : undefined,
-              lens: allTags.LensModel as string,
-              aperture,
-              shutterSpeed,
-              iso: allTags.ISOSpeedRatings?.toString(),
-              focalLength: allTags.FocalLength ? `${allTags.FocalLength}mm` : undefined,
-              width: img.naturalWidth,
-              height: img.naturalHeight,
-            };
-            
-            resolve(metadata);
-          } catch (err) {
-            console.error('Error parsing EXIF:', err);
-            resolve(createBasicMetadata());
-          }
-        });
-      } catch (err) {
-        clearTimeout(timeoutId);
-        console.error('Error getting EXIF data:', err);
-        resolve(createBasicMetadata());
+    reader.onload = function(e) {
+      const view = new DataView(e.target?.result as ArrayBuffer);
+      
+      // Check for JPEG
+      if (view.getUint16(0, false) !== 0xFFD8) {
+        console.log('Not a JPEG file');
+        resolve({});
+        return;
       }
+      
+      const length = view.byteLength;
+      let offset = 2;
+      
+      while (offset < length) {
+        if (view.getUint16(offset, false) === 0xFFE1) {
+          const exifData = parseExifData(view, offset + 4);
+          resolve(exifData);
+          return;
+        }
+        offset += 2 + view.getUint16(offset + 2, false);
+      }
+      
+      resolve({});
     };
     
-    img.onerror = () => {
-      clearTimeout(timeoutId);
-      console.error('Error loading image:', file.name);
-      resolve({
-        id: crypto.randomUUID(),
-        file,
-        url,
-        name: file.name,
-        size: file.size,
-      });
-    };
+    reader.onerror = () => resolve({});
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parseExifData(view: DataView, start: number): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  
+  try {
+    // Check for "Exif" header
+    const exifHeader = String.fromCharCode(
+      view.getUint8(start),
+      view.getUint8(start + 1),
+      view.getUint8(start + 2),
+      view.getUint8(start + 3)
+    );
     
+    if (exifHeader !== 'Exif') {
+      return result;
+    }
+    
+    const tiffOffset = start + 6;
+    const littleEndian = view.getUint16(tiffOffset, false) === 0x4949;
+    
+    const ifdOffset = view.getUint32(tiffOffset + 4, littleEndian);
+    const tags = parseTags(view, tiffOffset, tiffOffset + ifdOffset, littleEndian);
+    
+    Object.assign(result, tags);
+    
+    // Parse EXIF IFD
+    if (tags.ExifIFDPointer) {
+      const exifTags = parseTags(view, tiffOffset, tiffOffset + (tags.ExifIFDPointer as number), littleEndian);
+      Object.assign(result, exifTags);
+    }
+    
+    // Parse GPS IFD
+    if (tags.GPSInfoIFDPointer) {
+      const gpsTags = parseGPSTags(view, tiffOffset, tiffOffset + (tags.GPSInfoIFDPointer as number), littleEndian);
+      Object.assign(result, gpsTags);
+    }
+  } catch (err) {
+    console.error('Error parsing EXIF:', err);
+  }
+  
+  return result;
+}
+
+const TIFF_TAGS: Record<number, string> = {
+  0x010F: 'Make',
+  0x0110: 'Model',
+  0x0112: 'Orientation',
+  0x011A: 'XResolution',
+  0x011B: 'YResolution',
+  0x0128: 'ResolutionUnit',
+  0x0132: 'DateTime',
+  0x8769: 'ExifIFDPointer',
+  0x8825: 'GPSInfoIFDPointer',
+};
+
+const EXIF_TAGS: Record<number, string> = {
+  0x829A: 'ExposureTime',
+  0x829D: 'FNumber',
+  0x8827: 'ISOSpeedRatings',
+  0x9003: 'DateTimeOriginal',
+  0x9004: 'DateTimeDigitized',
+  0x920A: 'FocalLength',
+  0xA405: 'FocalLengthIn35mmFilm',
+  0xA433: 'LensMake',
+  0xA434: 'LensModel',
+};
+
+const GPS_TAGS: Record<number, string> = {
+  0x0000: 'GPSVersionID',
+  0x0001: 'GPSLatitudeRef',
+  0x0002: 'GPSLatitude',
+  0x0003: 'GPSLongitudeRef',
+  0x0004: 'GPSLongitude',
+  0x0005: 'GPSAltitudeRef',
+  0x0006: 'GPSAltitude',
+};
+
+function parseTags(view: DataView, tiffOffset: number, ifdOffset: number, littleEndian: boolean): Record<string, unknown> {
+  const tags: Record<string, unknown> = {};
+  const entries = view.getUint16(ifdOffset, littleEndian);
+  
+  for (let i = 0; i < entries; i++) {
+    const entryOffset = ifdOffset + 2 + i * 12;
+    const tag = view.getUint16(entryOffset, littleEndian);
+    const tagName = TIFF_TAGS[tag] || EXIF_TAGS[tag];
+    
+    if (tagName) {
+      const value = readTagValue(view, entryOffset, tiffOffset, littleEndian);
+      if (value !== undefined) {
+        tags[tagName] = value;
+      }
+    }
+  }
+  
+  return tags;
+}
+
+function parseGPSTags(view: DataView, tiffOffset: number, ifdOffset: number, littleEndian: boolean): Record<string, unknown> {
+  const tags: Record<string, unknown> = {};
+  const entries = view.getUint16(ifdOffset, littleEndian);
+  
+  for (let i = 0; i < entries; i++) {
+    const entryOffset = ifdOffset + 2 + i * 12;
+    const tag = view.getUint16(entryOffset, littleEndian);
+    const tagName = GPS_TAGS[tag];
+    
+    if (tagName) {
+      const value = readTagValue(view, entryOffset, tiffOffset, littleEndian);
+      if (value !== undefined) {
+        tags[tagName] = value;
+        console.log('GPS Tag:', tagName, value);
+      }
+    }
+  }
+  
+  return tags;
+}
+
+function readTagValue(view: DataView, entryOffset: number, tiffOffset: number, littleEndian: boolean): unknown {
+  const type = view.getUint16(entryOffset + 2, littleEndian);
+  const count = view.getUint32(entryOffset + 4, littleEndian);
+  const valueOffset = entryOffset + 8;
+  
+  switch (type) {
+    case 1: // BYTE
+      return view.getUint8(valueOffset);
+    case 2: { // ASCII
+      const strOffset = count > 4 ? tiffOffset + view.getUint32(valueOffset, littleEndian) : valueOffset;
+      let str = '';
+      for (let i = 0; i < count - 1; i++) {
+        str += String.fromCharCode(view.getUint8(strOffset + i));
+      }
+      return str;
+    }
+    case 3: // SHORT
+      return view.getUint16(valueOffset, littleEndian);
+    case 4: // LONG
+      return view.getUint32(valueOffset, littleEndian);
+    case 5: { // RATIONAL
+      const offset = tiffOffset + view.getUint32(valueOffset, littleEndian);
+      if (count === 1) {
+        const numerator = view.getUint32(offset, littleEndian);
+        const denominator = view.getUint32(offset + 4, littleEndian);
+        return denominator ? numerator / denominator : 0;
+      } else {
+        const values: number[] = [];
+        for (let i = 0; i < count; i++) {
+          const numerator = view.getUint32(offset + i * 8, littleEndian);
+          const denominator = view.getUint32(offset + i * 8 + 4, littleEndian);
+          values.push(denominator ? numerator / denominator : 0);
+        }
+        return values;
+      }
+    }
+    default:
+      return undefined;
+  }
+}
+
+export async function extractMetadata(file: File): Promise<PhotoMetadata> {
+  const url = URL.createObjectURL(file);
+  
+  // Get image dimensions
+  const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve({ width: 0, height: 0 });
     img.src = url;
   });
+  
+  // Read EXIF from binary
+  const exifData = await readExifFromFile(file);
+  console.log('EXIF data for', file.name, ':', exifData);
+  
+  let latitude: number | undefined;
+  let longitude: number | undefined;
+  let altitude: number | undefined;
+  
+  // Extract GPS coordinates
+  if (exifData.GPSLatitude && exifData.GPSLongitude) {
+    const latRef = (exifData.GPSLatitudeRef as string) || 'N';
+    const lonRef = (exifData.GPSLongitudeRef as string) || 'E';
+    
+    latitude = convertDMSToDD(exifData.GPSLatitude as number[], latRef);
+    longitude = convertDMSToDD(exifData.GPSLongitude as number[], lonRef);
+    
+    console.log('GPS coordinates:', latitude, longitude);
+  }
+  
+  // Extract altitude
+  if (exifData.GPSAltitude !== undefined) {
+    const altValue = exifData.GPSAltitude as number;
+    const altRef = (exifData.GPSAltitudeRef as number) || 0;
+    altitude = altRef === 1 ? -altValue : altValue;
+  }
+  
+  // Parse shutter speed
+  let shutterSpeed: string | undefined;
+  if (exifData.ExposureTime) {
+    const expTime = exifData.ExposureTime as number;
+    if (expTime < 1) {
+      shutterSpeed = `1/${Math.round(1 / expTime)}s`;
+    } else {
+      shutterSpeed = `${expTime}s`;
+    }
+  }
+  
+  // Parse aperture
+  let aperture: string | undefined;
+  if (exifData.FNumber) {
+    const fNum = exifData.FNumber as number;
+    aperture = `f/${fNum.toFixed(1)}`;
+  }
+  
+  const metadata: PhotoMetadata = {
+    id: crypto.randomUUID(),
+    file,
+    url,
+    name: file.name,
+    size: file.size,
+    dateCreated: parseExifDate((exifData.DateTimeOriginal as string) || (exifData.DateTime as string) || ''),
+    latitude,
+    longitude,
+    altitude,
+    camera: exifData.Make ? `${exifData.Make} ${exifData.Model || ''}`.trim() : undefined,
+    lens: exifData.LensModel as string,
+    aperture,
+    shutterSpeed,
+    iso: exifData.ISOSpeedRatings?.toString(),
+    focalLength: exifData.FocalLength ? `${Math.round(exifData.FocalLength as number)}mm` : undefined,
+    width: dimensions.width || undefined,
+    height: dimensions.height || undefined,
+  };
+  
+  return metadata;
 }
 
 export async function reverseGeocode(lat: number, lon: number): Promise<string> {
@@ -194,7 +343,6 @@ export function clusterPhotosByLocation(photos: PhotoMetadata[]): LocationCluste
   
   photos.forEach((photo) => {
     if (photo.latitude && photo.longitude) {
-      // Round to 2 decimal places for clustering
       const clusterKey = `${photo.latitude.toFixed(2)},${photo.longitude.toFixed(2)}`;
       
       if (clusters.has(clusterKey)) {
