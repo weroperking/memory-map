@@ -9,6 +9,7 @@ export interface PhotoMetadata {
   dateCreated?: Date;
   latitude?: number;
   longitude?: number;
+  altitude?: number;
   address?: string;
   camera?: string;
   lens?: string;
@@ -28,7 +29,11 @@ export interface LocationCluster {
   photos: PhotoMetadata[];
 }
 
-function convertDMSToDD(degrees: number, minutes: number, seconds: number, direction: string): number {
+function convertDMSToDD(dms: number[], direction: string): number {
+  if (!dms || dms.length < 3) return 0;
+  const degrees = dms[0] || 0;
+  const minutes = dms[1] || 0;
+  const seconds = dms[2] || 0;
   let dd = degrees + minutes / 60 + seconds / 3600;
   if (direction === 'S' || direction === 'W') {
     dd = dd * -1;
@@ -36,60 +41,126 @@ function convertDMSToDD(degrees: number, minutes: number, seconds: number, direc
   return dd;
 }
 
+function parseExifDate(dateStr: string): Date | undefined {
+  if (!dateStr) return undefined;
+  // EXIF format: "2024:01:15 14:30:00"
+  const parts = dateStr.split(' ');
+  if (parts.length >= 1) {
+    const datePart = parts[0].replace(/:/g, '-');
+    const timePart = parts[1] || '00:00:00';
+    const isoDate = `${datePart}T${timePart}`;
+    const parsed = new Date(isoDate);
+    return isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  return undefined;
+}
+
 export function extractMetadata(file: File): Promise<PhotoMetadata> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     
+    const createBasicMetadata = (): PhotoMetadata => ({
+      id: crypto.randomUUID(),
+      file,
+      url,
+      name: file.name,
+      size: file.size,
+      width: img.naturalWidth || undefined,
+      height: img.naturalHeight || undefined,
+    });
+
+    const timeoutId = setTimeout(() => {
+      console.log('EXIF extraction timeout for:', file.name);
+      resolve(createBasicMetadata());
+    }, 5000);
+
     img.onload = () => {
-      EXIF.getData(img as any, function(this: any) {
-        const allTags = EXIF.getAllTags(this);
-        
-        let latitude: number | undefined;
-        let longitude: number | undefined;
-        
-        if (allTags.GPSLatitude && allTags.GPSLongitude) {
-          const latRef = allTags.GPSLatitudeRef || 'N';
-          const lonRef = allTags.GPSLongitudeRef || 'E';
+      try {
+        EXIF.getData(img as unknown as HTMLImageElement, function (this: HTMLImageElement & { exifdata?: Record<string, unknown> }) {
+          clearTimeout(timeoutId);
           
-          latitude = convertDMSToDD(
-            allTags.GPSLatitude[0],
-            allTags.GPSLatitude[1],
-            allTags.GPSLatitude[2],
-            latRef
-          );
-          longitude = convertDMSToDD(
-            allTags.GPSLongitude[0],
-            allTags.GPSLongitude[1],
-            allTags.GPSLongitude[2],
-            lonRef
-          );
-        }
-        
-        const metadata: PhotoMetadata = {
-          id: crypto.randomUUID(),
-          file,
-          url,
-          name: file.name,
-          size: file.size,
-          dateCreated: allTags.DateTimeOriginal ? new Date(allTags.DateTimeOriginal.replace(/:/g, '-').replace(/-/, ':').replace(/-/, ':')) : undefined,
-          latitude,
-          longitude,
-          camera: allTags.Make ? `${allTags.Make} ${allTags.Model || ''}`.trim() : undefined,
-          lens: allTags.LensModel,
-          aperture: allTags.FNumber ? `f/${allTags.FNumber}` : undefined,
-          shutterSpeed: allTags.ExposureTime ? `1/${Math.round(1 / allTags.ExposureTime)}s` : undefined,
-          iso: allTags.ISOSpeedRatings?.toString(),
-          focalLength: allTags.FocalLength ? `${allTags.FocalLength}mm` : undefined,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        };
-        
-        resolve(metadata);
-      });
+          try {
+            const allTags = EXIF.getAllTags(this);
+            console.log('EXIF tags for', file.name, ':', allTags);
+            
+            let latitude: number | undefined;
+            let longitude: number | undefined;
+            let altitude: number | undefined;
+            
+            // Extract GPS coordinates
+            if (allTags.GPSLatitude && allTags.GPSLongitude) {
+              const latRef = allTags.GPSLatitudeRef || 'N';
+              const lonRef = allTags.GPSLongitudeRef || 'E';
+              
+              latitude = convertDMSToDD(allTags.GPSLatitude as number[], latRef as string);
+              longitude = convertDMSToDD(allTags.GPSLongitude as number[], lonRef as string);
+              
+              console.log('GPS found:', latitude, longitude);
+            }
+            
+            // Extract altitude
+            if (allTags.GPSAltitude !== undefined) {
+              const altValue = allTags.GPSAltitude as number;
+              const altRef = (allTags.GPSAltitudeRef as number) || 0;
+              altitude = altRef === 1 ? -altValue : altValue;
+              console.log('Altitude found:', altitude);
+            }
+            
+            // Parse shutter speed
+            let shutterSpeed: string | undefined;
+            if (allTags.ExposureTime) {
+              const expTime = allTags.ExposureTime as number;
+              if (expTime < 1) {
+                shutterSpeed = `1/${Math.round(1 / expTime)}s`;
+              } else {
+                shutterSpeed = `${expTime}s`;
+              }
+            }
+            
+            // Parse aperture
+            let aperture: string | undefined;
+            if (allTags.FNumber) {
+              const fNum = allTags.FNumber as number;
+              aperture = `f/${fNum.toFixed(1)}`;
+            }
+            
+            const metadata: PhotoMetadata = {
+              id: crypto.randomUUID(),
+              file,
+              url,
+              name: file.name,
+              size: file.size,
+              dateCreated: parseExifDate(allTags.DateTimeOriginal as string || allTags.DateTime as string || ''),
+              latitude,
+              longitude,
+              altitude,
+              camera: allTags.Make ? `${allTags.Make} ${allTags.Model || ''}`.trim() : undefined,
+              lens: allTags.LensModel as string,
+              aperture,
+              shutterSpeed,
+              iso: allTags.ISOSpeedRatings?.toString(),
+              focalLength: allTags.FocalLength ? `${allTags.FocalLength}mm` : undefined,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+            };
+            
+            resolve(metadata);
+          } catch (err) {
+            console.error('Error parsing EXIF:', err);
+            resolve(createBasicMetadata());
+          }
+        });
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error('Error getting EXIF data:', err);
+        resolve(createBasicMetadata());
+      }
     };
     
     img.onerror = () => {
+      clearTimeout(timeoutId);
+      console.error('Error loading image:', file.name);
       resolve({
         id: crypto.randomUUID(),
         file,

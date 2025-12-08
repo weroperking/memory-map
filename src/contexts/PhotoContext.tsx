@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { PhotoMetadata, extractMetadata, reverseGeocode, LocationCluster, clusterPhotosByLocation } from '@/lib/exif-utils';
+import { toast } from 'sonner';
 
 interface PhotoContextType {
   photos: PhotoMetadata[];
@@ -21,30 +22,56 @@ export function PhotoProvider({ children }: { children: React.ReactNode }) {
 
   const addPhotos = useCallback(async (files: FileList) => {
     setIsLoading(true);
+    console.log('Starting to process', files.length, 'files');
     
-    const newPhotos: PhotoMetadata[] = [];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.type.startsWith('image/')) {
-        const metadata = await extractMetadata(file);
+    try {
+      const newPhotos: PhotoMetadata[] = [];
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log('Processing file:', file.name, file.type);
         
-        // Get address if coordinates exist
-        if (metadata.latitude && metadata.longitude) {
-          metadata.address = await reverseGeocode(metadata.latitude, metadata.longitude);
+        if (file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|heic|heif|webp)$/i)) {
+          try {
+            const metadata = await extractMetadata(file);
+            console.log('Extracted metadata:', metadata);
+            
+            // Get address if coordinates exist
+            if (metadata.latitude && metadata.longitude) {
+              try {
+                metadata.address = await reverseGeocode(metadata.latitude, metadata.longitude);
+                console.log('Reverse geocoded:', metadata.address);
+              } catch (err) {
+                console.error('Geocoding error:', err);
+              }
+            }
+            
+            newPhotos.push(metadata);
+          } catch (err) {
+            console.error('Error processing file:', file.name, err);
+          }
         }
-        
-        newPhotos.push(metadata);
       }
+      
+      console.log('Processed', newPhotos.length, 'photos');
+      
+      if (newPhotos.length > 0) {
+        const withLocation = newPhotos.filter(p => p.latitude && p.longitude).length;
+        toast.success(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`, {
+          description: withLocation > 0 ? `${withLocation} with GPS location data` : 'No GPS data found',
+        });
+      }
+      
+      setPhotos((prev) => {
+        const updated = [...prev, ...newPhotos];
+        setClusters(clusterPhotosByLocation(updated));
+        return updated;
+      });
+    } catch (err) {
+      console.error('Error in addPhotos:', err);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setPhotos((prev) => {
-      const updated = [...prev, ...newPhotos];
-      setClusters(clusterPhotosByLocation(updated));
-      return updated;
-    });
-    
-    setIsLoading(false);
   }, []);
 
   const selectPhoto = useCallback((photo: PhotoMetadata | null) => {
