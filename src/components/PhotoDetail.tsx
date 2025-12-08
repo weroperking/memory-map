@@ -1,8 +1,9 @@
-import { MapPin, Calendar, Camera, Aperture, Timer, Gauge, Maximize, HardDrive, Sparkles, Lock, Mountain } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { MapPin, Calendar, Camera, Aperture, Timer, Gauge, Maximize, HardDrive, Mountain, AlertCircle } from 'lucide-react';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { formatFileSize } from '@/lib/exif-utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AIDetectionPanel } from './AIDetectionPanel';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PhotoDetailProps {
   onUpgrade: () => void;
@@ -25,10 +26,12 @@ export function PhotoDetail({ onUpgrade }: PhotoDetailProps) {
     { icon: HardDrive, label: 'Size', value: formatFileSize(selectedPhoto.size) },
   ].filter((m) => m.value);
 
+  const hasGPS = selectedPhoto.latitude && selectedPhoto.longitude;
+
   return (
     <Dialog open={!!selectedPhoto} onOpenChange={() => selectPhoto(null)}>
-      <DialogContent className="max-w-4xl border-2 border-foreground p-0 shadow-lg">
-        <div className="grid md:grid-cols-2">
+      <DialogContent className="max-w-4xl max-h-[90vh] border-2 border-foreground p-0 shadow-lg overflow-hidden">
+        <div className="grid md:grid-cols-2 max-h-[90vh]">
           {/* Image */}
           <div className="relative aspect-square bg-muted">
             <img
@@ -39,12 +42,25 @@ export function PhotoDetail({ onUpgrade }: PhotoDetailProps) {
           </div>
 
           {/* Metadata */}
-          <div className="flex flex-col">
+          <ScrollArea className="flex flex-col max-h-[90vh]">
             <DialogHeader className="border-b-2 border-foreground p-4">
               <DialogTitle className="font-mono text-lg">{selectedPhoto.name}</DialogTitle>
             </DialogHeader>
 
             <div className="flex-1 space-y-3 p-4">
+              {/* GPS Warning if no location */}
+              {!hasGPS && (
+                <div className="flex items-start gap-3 p-3 rounded-lg border-2 border-chart-1 bg-chart-1/10">
+                  <AlertCircle className="h-5 w-5 text-chart-1 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-mono text-sm font-bold text-chart-1">No GPS Data</p>
+                    <p className="text-xs text-muted-foreground">
+                      Browsers often strip location data for privacy. Check the "GPS Tips" button in the header for help.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {metadata.map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex items-start gap-3 border-b border-border pb-3">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 border-foreground bg-secondary">
@@ -57,7 +73,7 @@ export function PhotoDetail({ onUpgrade }: PhotoDetailProps) {
                 </div>
               ))}
 
-              {selectedPhoto.latitude && selectedPhoto.longitude && (
+              {hasGPS && (
                 <div className="flex items-start gap-3 border-b border-border pb-3">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 border-foreground bg-chart-2 text-primary-foreground">
                     <MapPin className="h-4 w-4" />
@@ -65,31 +81,19 @@ export function PhotoDetail({ onUpgrade }: PhotoDetailProps) {
                   <div>
                     <p className="text-xs font-mono text-muted-foreground uppercase">GPS Coordinates</p>
                     <p className="font-mono text-sm">
-                      {selectedPhoto.latitude.toFixed(6)}, {selectedPhoto.longitude.toFixed(6)}
+                      {selectedPhoto.latitude!.toFixed(6)}, {selectedPhoto.longitude!.toFixed(6)}
                     </p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Premium Feature Teaser */}
-            <div className="border-t-2 border-foreground bg-chart-4/20 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Lock className="h-4 w-4" />
-                <span className="font-mono text-sm font-bold">PRO FEATURE</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-3">
-                Check if this image was AI-generated with our advanced detection algorithm.
-              </p>
-              <Button
-                onClick={onUpgrade}
-                className="w-full gap-2 bg-chart-4 text-foreground hover:bg-chart-4/90 border-2 border-foreground"
-              >
-                <Sparkles className="h-4 w-4" />
-                Unlock AI Detection
-              </Button>
-            </div>
-          </div>
+            {/* AI Detection Panel - Now unlocked */}
+            <AIDetectionPanel 
+              imageUrl={selectedPhoto.url} 
+              imageName={selectedPhoto.name} 
+            />
+          </ScrollArea>
         </div>
       </DialogContent>
     </Dialog>

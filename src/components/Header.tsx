@@ -2,6 +2,7 @@ import { MapPin, Image, Sparkles, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
+import { GPSTipsDialog } from './GPSTipsDialog';
 
 interface HeaderProps {
   activeView: 'gallery' | 'map';
@@ -53,6 +54,7 @@ export function Header({ activeView, onViewChange, onUpgrade }: HeaderProps) {
         <nav className="hidden items-center gap-2 md:flex">
           <NavItems />
           <div className="ml-4 h-8 w-px bg-foreground" />
+          <GPSTipsDialog />
           <Button
             onClick={onUpgrade}
             className="gap-2 bg-chart-4 text-foreground hover:bg-chart-4/90 border-2 border-foreground shadow-sm"
@@ -72,6 +74,7 @@ export function Header({ activeView, onViewChange, onUpgrade }: HeaderProps) {
           <SheetContent side="right" className="w-72 border-l-2 border-foreground">
             <div className="mt-8 flex flex-col gap-4">
               <NavItems />
+              <GPSTipsDialog />
               <Button
                 onClick={() => {
                   onUpgrade();
