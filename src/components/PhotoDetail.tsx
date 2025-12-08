@@ -1,4 +1,4 @@
-import { X, MapPin, Calendar, Camera, Aperture, Timer, Gauge, Maximize, HardDrive, Sparkles, Lock } from 'lucide-react';
+import { MapPin, Calendar, Camera, Aperture, Timer, Gauge, Maximize, HardDrive, Sparkles, Lock, Mountain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { formatFileSize } from '@/lib/exif-utils';
@@ -20,6 +20,7 @@ export function PhotoDetail({ onUpgrade }: PhotoDetailProps) {
     { icon: Aperture, label: 'Aperture', value: selectedPhoto.aperture },
     { icon: Timer, label: 'Shutter', value: selectedPhoto.shutterSpeed },
     { icon: Gauge, label: 'ISO', value: selectedPhoto.iso },
+    { icon: Mountain, label: 'Altitude', value: selectedPhoto.altitude !== undefined ? `${selectedPhoto.altitude.toFixed(1)}m` : undefined },
     { icon: Maximize, label: 'Resolution', value: selectedPhoto.width && selectedPhoto.height ? `${selectedPhoto.width} × ${selectedPhoto.height}` : undefined },
     { icon: HardDrive, label: 'Size', value: formatFileSize(selectedPhoto.size) },
   ].filter((m) => m.value);
