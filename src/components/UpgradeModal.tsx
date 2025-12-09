@@ -1,6 +1,7 @@
-import { Check, Sparkles, Zap, Shield, Download, Brain, X } from 'lucide-react';
+import { Check, Sparkles, Zap, Shield, Download, Brain, X, Edit3, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -8,11 +9,18 @@ interface UpgradeModalProps {
   onUpgradeComplete?: () => void;
 }
 
-const features = [
+const mainFeatures = [
   { icon: Brain, text: 'AI-Generated Image Detection' },
-  { icon: Download, text: 'Offline Map Downloads' },
+  { icon: Edit3, text: 'Edit & Modify Image Metadata' },
+  { icon: Package, text: 'Batch Process & Download Images' },
   { icon: Shield, text: 'Privacy Mode - Local Processing' },
-  { icon: Zap, text: 'Batch Export with Metadata' },
+];
+
+const premiumMetadataFields = [
+  'Focal Length', 'Color Space', 'Dots/Inch (DPI)',
+  'Time Zone', 'Latitude Ref', 'Longitude Ref',
+  'Altitude Ref', 'Direction Ref', 'Direction',
+  'Pointing Direction', 'City', 'State', 'Country'
 ];
 
 const plans = [
@@ -54,19 +62,37 @@ export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModa
             </p>
           </DialogHeader>
 
-          {/* Features */}
-          <div className="mb-8 grid gap-3 sm:grid-cols-2">
-            {features.map(({ icon: Icon, text }) => (
-              <div
-                key={text}
-                className="flex items-center gap-3 border-2 border-foreground bg-background p-3 shadow-xs"
-              >
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 border-foreground bg-chart-2 text-primary-foreground">
-                  <Icon className="h-4 w-4" />
+          {/* Main Features */}
+          <div className="mb-8">
+            <h3 className="text-sm font-mono font-bold uppercase text-foreground mb-4">✨ Premium Features</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {mainFeatures.map(({ icon: Icon, text }) => (
+                <div
+                  key={text}
+                  className="flex items-center gap-3 border-2 border-chart-4 bg-chart-4/5 p-3 rounded hover:bg-chart-4/10 transition-colors"
+                >
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 border-chart-4 bg-chart-4 text-foreground rounded">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <span className="text-sm font-medium">{text}</span>
                 </div>
-                <span className="text-sm font-medium">{text}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Metadata Fields */}
+          <div className="mb-8">
+            <h3 className="text-sm font-mono font-bold uppercase text-foreground mb-4">📊 Access 13 Premium Metadata Fields</h3>
+            <div className="border-2 border-chart-4 bg-chart-4/5 rounded p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {premiumMetadataFields.map((field) => (
+                  <div key={field} className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-chart-4 flex-shrink-0" />
+                    <span className="text-muted-foreground">{field}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
 
           {/* Pricing */}

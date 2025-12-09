@@ -1,10 +1,13 @@
-import { MapPin, Calendar, Camera, Aperture, Timer, Gauge, Maximize, HardDrive, Mountain, AlertCircle, Compass, Droplets, PenTool, Lock, Clock } from 'lucide-react';
+import { MapPin, Calendar, Camera, Aperture, Timer, Gauge, Maximize, HardDrive, Mountain, AlertCircle, Compass, Droplets, PenTool, Lock, Clock, Edit3 } from 'lucide-react';
+import { useState } from 'react';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { formatFileSize } from '@/lib/exif-utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AIDetectionPanel } from './AIDetectionPanel';
+import { MetadataEditor } from './MetadataEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface PhotoDetailProps {
   onUpgrade: () => void;
@@ -13,6 +16,7 @@ interface PhotoDetailProps {
 
 export function PhotoDetail({ onUpgrade, isPro = false }: PhotoDetailProps) {
   const { selectedPhoto, selectPhoto } = usePhotos();
+  const [showEditor, setShowEditor] = useState(false);
 
   if (!selectedPhoto) return null;
 
@@ -51,7 +55,7 @@ export function PhotoDetail({ onUpgrade, isPro = false }: PhotoDetailProps) {
     { icon: MapPin, label: 'City', value: selectedPhoto.city, isPremium: true },
     { icon: MapPin, label: 'State', value: selectedPhoto.state, isPremium: true },
     { icon: MapPin, label: 'Country', value: selectedPhoto.country, isPremium: true },
-  ].filter((m) => m.value);
+  ];
 
   const hasGPS = selectedPhoto.latitude && selectedPhoto.longitude;
 
@@ -103,43 +107,38 @@ export function PhotoDetail({ onUpgrade, isPro = false }: PhotoDetailProps) {
 
 
 
-              {/* Premium Metadata Section */}
+              {/* Premium Metadata Section - Now Free */}
               {premiumMetadata.length > 0 && (
                 <div className="mt-6 pt-6 border-t-4 border-chart-4">
                   <div className="mb-4 p-3 border-2 border-chart-4 bg-chart-4/5 rounded">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-mono font-bold uppercase text-chart-4">✨ Premium Details</h3>
-                      {!isPro && <Badge className="bg-chart-4 text-foreground text-xs font-bold">Unlock Pro</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">See {premiumMetadata.length} more details with Pro</p>
-                  </div>
-                  
-                  {premiumMetadata.map(({ icon: Icon, label, value, isPremium }) => (
-                    <div key={label} className={`flex items-start gap-3 border-b border-border pb-3 transition-all ${
-                      !isPro && isPremium ? 'bg-chart-4/5 p-2 rounded border-2 border-chart-4 opacity-100' : 'opacity-75 hover:opacity-100'
-                    }`}>
-                      <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 rounded relative ${
-                        !isPro && isPremium ? 'border-chart-4 bg-chart-4' : 'border-foreground bg-secondary'
-                      }`}>
-                        <Icon className={`h-4 w-4 ${!isPro && isPremium ? 'text-foreground' : ''}`} />
-                        {!isPro && isPremium && (
-                          <Lock className="h-3 w-3 absolute -top-1 -right-1 bg-background rounded-full p-0.5 text-chart-4" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-mono font-bold uppercase text-chart-4">📊 Premium Details ({premiumMetadata.length})</h3>
+                        {!isPro && (
+                            <Badge className="bg-chart-4 text-foreground text-xs font-bold ml-2">Unlock Pro</Badge>
                         )}
                       </div>
+                      <Button
+                        onClick={() => (isPro ? setShowEditor(true) : onUpgrade())}
+                        size="sm"
+                        className="bg-chart-4 text-foreground hover:bg-chart-4/90"
+                      >
+                        <Edit3 className="h-3 w-3 mr-1" />
+                        {isPro ? 'Edit All' : 'Edit Metadata'}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Edit and batch download with updated metadata. Upgrade to see all premium fields and AI detection.
+                    </p>
+                  </div>
+                  {premiumMetadata.map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="flex items-start gap-3 border-b border-border pb-3 hover:bg-muted/50 transition-colors px-0 py-3">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 border-foreground bg-secondary">
+                        <Icon className="h-4 w-4" />
+                      </div>
                       <div className="flex-1">
-                        <p className={`text-xs font-mono uppercase ${
-                          !isPro && isPremium ? 'text-chart-4 font-bold' : 'text-muted-foreground'
-                        }`}>{label}</p>
-                        {isPro || !isPremium ? (
-                          <p className={`font-medium ${!isPro && isPremium ? 'text-chart-4 font-bold' : ''}`}>{value}</p>
-                        ) : (
-                          <button 
-                            onClick={onUpgrade}
-                            className="text-xs font-mono font-bold text-chart-4 hover:underline"
-                          >
-                            Unlock with Pro →
-                          </button>
-                        )}
+                        <p className="text-xs font-mono text-muted-foreground uppercase">{label}</p>
+                        <p className="font-medium">{isPro ? (value ?? '—') : <span className="text-muted-foreground">Unlock Pro to view</span>}</p>
                       </div>
                     </div>
                   ))}
@@ -157,6 +156,13 @@ export function PhotoDetail({ onUpgrade, isPro = false }: PhotoDetailProps) {
           </ScrollArea>
         </div>
       </DialogContent>
+
+      {/* Metadata Editor for Pro Users */}
+      <MetadataEditor 
+        isOpen={showEditor}
+        onClose={() => setShowEditor(false)}
+        isPro={isPro}
+      />
     </Dialog>
   );
 }

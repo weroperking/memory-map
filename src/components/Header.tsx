@@ -1,8 +1,9 @@
-import { MapPin, Image, Sparkles, Menu } from 'lucide-react';
+import { MapPin, Image, Sparkles, Menu, Edit3, Package, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { GPSTipsDialog } from './GPSTipsDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface HeaderProps {
   activeView: 'gallery' | 'map';
@@ -55,13 +56,35 @@ export function Header({ activeView, onViewChange, onUpgrade }: HeaderProps) {
           <NavItems />
           <div className="ml-4 h-8 w-px bg-foreground" />
           <GPSTipsDialog />
-          <Button
-            onClick={onUpgrade}
-            className="gap-2 bg-chart-4 text-foreground hover:bg-chart-4/90 border-2 border-foreground shadow-sm"
-          >
-            <Sparkles className="h-4 w-4" />
-            Upgrade to Pro
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={onUpgrade}
+                  className="gap-2 bg-chart-4 text-foreground hover:bg-chart-4/90 border-2 border-foreground shadow-sm animate-pulse"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Upgrade to Pro
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="border-2 border-chart-4 bg-chart-4/95 text-foreground">
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2 font-bold">
+                    <Edit3 className="h-3 w-3" />
+                    Edit Image Metadata
+                  </div>
+                  <div className="flex items-center gap-2 font-bold">
+                    <Package className="h-3 w-3" />
+                    Batch Download Images
+                  </div>
+                  <div className="flex items-center gap-2 font-bold">
+                    <Brain className="h-3 w-3" />
+                    AI Detection + 13 Fields
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </nav>
 
         {/* Mobile Navigation */}
@@ -80,11 +103,26 @@ export function Header({ activeView, onViewChange, onUpgrade }: HeaderProps) {
                   onUpgrade();
                   setIsOpen(false);
                 }}
-                className="gap-2 bg-chart-4 text-foreground hover:bg-chart-4/90 border-2 border-foreground"
+                className="gap-2 bg-chart-4 text-foreground hover:bg-chart-4/90 border-2 border-foreground animate-pulse"
               >
                 <Sparkles className="h-4 w-4" />
                 Upgrade to Pro
               </Button>
+              <div className="border-t-2 border-foreground pt-4 text-xs space-y-2">
+                <p className="font-bold text-chart-4">Pro Features:</p>
+                <div className="flex items-center gap-2">
+                  <Edit3 className="h-3 w-3 text-chart-4" />
+                  <span>Edit Image Metadata</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Package className="h-3 w-3 text-chart-4" />
+                  <span>Batch Download</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Brain className="h-3 w-3 text-chart-4" />
+                  <span>AI + 13 Metadata Fields</span>
+                </div>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
