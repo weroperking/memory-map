@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import imageCompression from 'browser-image-compression';
 import { PhotoMetadata, extractMetadata, reverseGeocode, LocationCluster, clusterPhotosByLocation } from '@/lib/exif-utils';
 import { toast } from 'sonner';
 
@@ -34,27 +33,11 @@ export function PhotoProvider({ children }: { children: React.ReactNode }) {
         
         if (file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|heic|heif|webp)$/i)) {
           try {
-            // Use browser-image-compression to preserve EXIF data
-            const options = {
-              maxSizeMB: 10, // Keep high to avoid quality loss
-              maxWidthOrHeight: 4096,
-              useWebWorker: true,
-              preserveExif: true, // CRITICAL: This keeps GPS/Date data
-            };
-            
-            // Process file to ensure EXIF is preserved
-            let processedFile: File;
-            try {
-              const compressedBlob = await imageCompression(file, options);
-              processedFile = new File([compressedBlob], file.name, { type: file.type || 'image/jpeg' });
-              console.log('Processed with EXIF preservation:', processedFile.name);
-            } catch (compressionError) {
-              console.warn('Compression failed, using original file:', compressionError);
-              processedFile = file;
-            }
-            
-            const metadata = await extractMetadata(processedFile);
-            console.log('Extracted metadata:', metadata);
+            // CRITICAL: Extract metadata from ORIGINAL file FIRST before any processing
+            // Browser compression can strip EXIF data even with preserveExif flag
+            console.log('Extracting metadata from ORIGINAL file:', file.name);
+            const metadata = await extractMetadata(file);
+            console.log('Extracted metadata from original:', metadata);
             
             // Get address if coordinates exist
             if (metadata.latitude && metadata.longitude) {

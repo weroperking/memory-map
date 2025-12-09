@@ -52,37 +52,76 @@ function parseExifDate(dateStr: string): Date | undefined {
   return undefined;
 }
 
-// Read EXIF from file binary directly
+// Read EXIF from file binary directly - improved version
 async function readExifFromFile(file: File): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
     const reader = new FileReader();
     
     reader.onload = function(e) {
-      const view = new DataView(e.target?.result as ArrayBuffer);
-      
-      // Check for JPEG
-      if (view.getUint16(0, false) !== 0xFFD8) {
-        console.log('Not a JPEG file');
-        resolve({});
-        return;
-      }
-      
-      const length = view.byteLength;
-      let offset = 2;
-      
-      while (offset < length) {
-        if (view.getUint16(offset, false) === 0xFFE1) {
-          const exifData = parseExifData(view, offset + 4);
-          resolve(exifData);
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const view = new DataView(buffer);
+        
+        // Check for JPEG
+        if (view.getUint16(0, false) !== 0xFFD8) {
+          console.log('Not a JPEG file, trying alternative detection');
+          resolve({});
           return;
         }
-        offset += 2 + view.getUint16(offset + 2, false);
+        
+        console.log('JPEG detected, searching for EXIF marker...');
+        const length = view.byteLength;
+        let offset = 2;
+        
+        // Search through all markers
+        while (offset < length - 4) {
+          const marker = view.getUint16(offset, false);
+          
+          // APP1 marker (EXIF)
+          if (marker === 0xFFE1) {
+            const segmentLength = view.getUint16(offset + 2, false);
+            console.log('Found APP1 marker at offset', offset, 'length:', segmentLength);
+            
+            // Check if this is EXIF data
+            const exifHeader = String.fromCharCode(
+              view.getUint8(offset + 4),
+              view.getUint8(offset + 5),
+              view.getUint8(offset + 6),
+              view.getUint8(offset + 7)
+            );
+            
+            if (exifHeader === 'Exif') {
+              console.log('EXIF header confirmed');
+              const exifData = parseExifData(view, offset + 4);
+              console.log('Parsed EXIF data:', exifData);
+              resolve(exifData);
+              return;
+            }
+          }
+          
+          // Move to next marker
+          if (marker === 0xFFD8 || marker === 0xFFD9) {
+            offset += 2;
+          } else if ((marker & 0xFF00) === 0xFF00) {
+            const segLen = view.getUint16(offset + 2, false);
+            offset += 2 + segLen;
+          } else {
+            offset++;
+          }
+        }
+        
+        console.log('No EXIF data found in file');
+        resolve({});
+      } catch (err) {
+        console.error('Error reading EXIF:', err);
+        resolve({});
       }
-      
-      resolve({});
     };
     
-    reader.onerror = () => resolve({});
+    reader.onerror = () => {
+      console.error('FileReader error');
+      resolve({});
+    };
     reader.readAsArrayBuffer(file);
   });
 }

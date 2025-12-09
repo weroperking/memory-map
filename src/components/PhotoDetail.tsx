@@ -88,10 +88,12 @@ export function PhotoDetail({ onUpgrade }: PhotoDetailProps) {
               )}
             </div>
 
-            {/* AI Detection Panel - Now unlocked */}
+            {/* AI Detection Panel */}
             <AIDetectionPanel 
               imageUrl={selectedPhoto.url} 
-              imageName={selectedPhoto.name} 
+              imageName={selectedPhoto.name}
+              isPro={true}
+              onUpgrade={onUpgrade}
             />
           </ScrollArea>
         </div>
