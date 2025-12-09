@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import imageCompression from 'browser-image-compression';
 import { PhotoMetadata, extractMetadata, reverseGeocode, LocationCluster, clusterPhotosByLocation } from '@/lib/exif-utils';
 import { toast } from 'sonner';
 
@@ -33,7 +34,26 @@ export function PhotoProvider({ children }: { children: React.ReactNode }) {
         
         if (file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|heic|heif|webp)$/i)) {
           try {
-            const metadata = await extractMetadata(file);
+            // Use browser-image-compression to preserve EXIF data
+            const options = {
+              maxSizeMB: 10, // Keep high to avoid quality loss
+              maxWidthOrHeight: 4096,
+              useWebWorker: true,
+              preserveExif: true, // CRITICAL: This keeps GPS/Date data
+            };
+            
+            // Process file to ensure EXIF is preserved
+            let processedFile: File;
+            try {
+              const compressedBlob = await imageCompression(file, options);
+              processedFile = new File([compressedBlob], file.name, { type: file.type || 'image/jpeg' });
+              console.log('Processed with EXIF preservation:', processedFile.name);
+            } catch (compressionError) {
+              console.warn('Compression failed, using original file:', compressionError);
+              processedFile = file;
+            }
+            
+            const metadata = await extractMetadata(processedFile);
             console.log('Extracted metadata:', metadata);
             
             // Get address if coordinates exist
@@ -58,7 +78,7 @@ export function PhotoProvider({ children }: { children: React.ReactNode }) {
       if (newPhotos.length > 0) {
         const withLocation = newPhotos.filter(p => p.latitude && p.longitude).length;
         toast.success(`Added ${newPhotos.length} photo${newPhotos.length > 1 ? 's' : ''}`, {
-          description: withLocation > 0 ? `${withLocation} with GPS location data` : 'No GPS data found',
+          description: withLocation > 0 ? `${withLocation} with GPS location data` : 'No GPS data found - check GPS Tips for help',
         });
       }
       
