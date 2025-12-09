@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onUpgradeComplete?: () => void;
 }
 
 const features = [
@@ -36,7 +37,7 @@ const plans = [
   },
 ];
 
-export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
+export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl border-2 border-foreground p-0 shadow-lg">
@@ -95,6 +96,10 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   )}
                 </div>
                 <Button
+                  onClick={() => {
+                    onUpgradeComplete?.();
+                    onClose();
+                  }}
                   className={`mt-4 w-full ${
                     plan.popular
                       ? 'bg-chart-4 text-foreground hover:bg-chart-4/90'

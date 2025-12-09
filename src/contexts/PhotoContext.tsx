@@ -42,8 +42,12 @@ export function PhotoProvider({ children }: { children: React.ReactNode }) {
             // Get address if coordinates exist
             if (metadata.latitude && metadata.longitude) {
               try {
-                metadata.address = await reverseGeocode(metadata.latitude, metadata.longitude);
-                console.log('Reverse geocoded:', metadata.address);
+                const geoData = await reverseGeocode(metadata.latitude, metadata.longitude);
+                metadata.address = geoData.address;
+                metadata.city = geoData.city;
+                metadata.state = geoData.state;
+                metadata.country = geoData.country;
+                console.log('Reverse geocoded:', geoData);
               } catch (err) {
                 console.error('Geocoding error:', err);
               }

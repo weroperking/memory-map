@@ -10,6 +10,7 @@ import { PhotoProvider } from '@/contexts/PhotoContext';
 const Index = () => {
   const [activeView, setActiveView] = useState<'gallery' | 'map'>('gallery');
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [isPro, setIsPro] = useState(false);
 
   return (
     <PhotoProvider>
@@ -26,8 +27,8 @@ const Index = () => {
           {activeView === 'gallery' ? <PhotoGallery /> : <PhotoMap />}
         </main>
 
-        <PhotoDetail onUpgrade={() => setShowUpgrade(true)} />
-        <UpgradeModal isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} />
+        <PhotoDetail onUpgrade={() => setShowUpgrade(true)} isPro={isPro} />
+        <UpgradeModal isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgradeComplete={() => setIsPro(true)} />
       </div>
     </PhotoProvider>
   );

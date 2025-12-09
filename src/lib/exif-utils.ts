@@ -19,6 +19,19 @@ export interface PhotoMetadata {
   focalLength?: string;
   width?: number;
   height?: number;
+  // Premium fields
+  colorSpace?: string;
+  dotsPerInch?: number;
+  timeZone?: string;
+  latitudeRef?: string;
+  longitudeRef?: string;
+  altitudeRef?: string;
+  directionRef?: string;
+  direction?: string;
+  pointingDirection?: string;
+  city?: string;
+  state?: string;
+  country?: string;
 }
 
 export interface LocationCluster {
@@ -117,6 +130,28 @@ export async function extractMetadata(file: File): Promise<PhotoMetadata> {
     }
   }
   
+  // Extract DPI/DPM information
+  let dotsPerInch: number | undefined;
+  if (exifData.XResolution) {
+    const xres = exifData.XResolution as number;
+    const resUnit = exifData.ResolutionUnit as number | undefined;
+    // ResolutionUnit: 2 = inches, 3 = centimeters
+    dotsPerInch = resUnit === 3 ? Math.round(xres / 2.54) : Math.round(xres);
+  }
+
+  // Extract color space information
+  let colorSpace: string | undefined;
+  if (exifData.ColorSpace) {
+    const cs = exifData.ColorSpace;
+    if (cs === 1) {
+      colorSpace = 'sRGB';
+    } else if (cs === 65535) {
+      colorSpace = 'Uncalibrated';
+    } else {
+      colorSpace = cs?.toString();
+    }
+  }
+
   const metadata: PhotoMetadata = {
     id: crypto.randomUUID(),
     file,
@@ -127,6 +162,7 @@ export async function extractMetadata(file: File): Promise<PhotoMetadata> {
     latitude: gpsData.latitude,
     longitude: gpsData.longitude,
     altitude: exifData.GPSAltitude as number | undefined,
+    altitudeRef: exifData.GPSAltitudeRef?.toString(),
     camera,
     lens: exifData.LensModel as string | undefined,
     aperture,
@@ -135,24 +171,50 @@ export async function extractMetadata(file: File): Promise<PhotoMetadata> {
     focalLength: exifData.FocalLength ? `${Math.round(exifData.FocalLength as number)}mm` : undefined,
     width: dimensions.width || undefined,
     height: dimensions.height || undefined,
+    // Premium fields
+    colorSpace,
+    dotsPerInch,
+    timeZone: exifData.TimeZoneOffset?.toString(),
+    latitudeRef: exifData.GPSLatitudeRef?.toString(),
+    longitudeRef: exifData.GPSLongitudeRef?.toString(),
+    directionRef: exifData.GPSImgDirectionRef?.toString(),
+    direction: exifData.GPSImgDirection?.toString(),
+    pointingDirection: exifData.GPSDestBearingRef?.toString(),
   };
   
   console.log('Final metadata:', metadata);
   return metadata;
 }
 
-export async function reverseGeocode(lat: number, lon: number): Promise<string> {
+export async function reverseGeocode(lat: number, lon: number): Promise<{ address: string; city?: string; state?: string; country?: string }> {
   try {
     const response = await fetch(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${lon},${lat}.json?access_token=pk.eyJ1IjoibG92YWJsZS1kZW1vIiwiYSI6ImNtNXN6Z3A2bDBsMW8yanM2aG15cDVlbHIifQ.sk0KbXhxCHPvqOWVYR-qcg`
     );
     const data = await response.json();
     if (data.features && data.features.length > 0) {
-      return data.features[0].place_name;
+      const feature = data.features[0];
+      const address = feature.place_name;
+      
+      // Extract city, state, country from context
+      let city: string | undefined;
+      let state: string | undefined;
+      let country: string | undefined;
+      
+      // Parse context to get region info
+      if (feature.context) {
+        feature.context.forEach((ctx: any) => {
+          if (ctx.id.includes('place')) city = ctx.text;
+          if (ctx.id.includes('region')) state = ctx.text;
+          if (ctx.id.includes('country')) country = ctx.text;
+        });
+      }
+      
+      return { address, city, state, country };
     }
-    return 'Unknown Location';
+    return { address: 'Unknown Location' };
   } catch {
-    return 'Unknown Location';
+    return { address: 'Unknown Location' };
   }
 }
 
