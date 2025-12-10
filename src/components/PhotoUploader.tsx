@@ -130,7 +130,7 @@ export function PhotoUploader() {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,application/octet-stream"
+                accept="image/*,application/json"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -139,7 +139,7 @@ export function PhotoUploader() {
               <input
                 ref={cameraInputRef}
                 type="file"
-                accept="image/*,application/octet-stream"
+                accept="image/*"
                 capture="environment"
                 onChange={handleFileChange}
                 className="hidden"
@@ -151,6 +151,7 @@ export function PhotoUploader() {
                 type="file"
                 multiple
                 onChange={handleFileChange}
+                accept="image/*,application/json"
                 className="hidden"
               />
               
@@ -192,7 +193,7 @@ export function PhotoUploader() {
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*,application/octet-stream"
+          accept="image/*,application/json"
           onChange={handleFileChange}
           className="hidden"
         />
@@ -201,7 +202,7 @@ export function PhotoUploader() {
         <input
           ref={cameraInputRef}
           type="file"
-          accept="image/*,application/octet-stream"
+          accept="image/*"
           capture="environment"
           onChange={handleFileChange}
           className="hidden"
@@ -213,6 +214,7 @@ export function PhotoUploader() {
           type="file"
           multiple
           onChange={handleFileChange}
+          accept="image/*,application/json"
           className="hidden"
         />
         
