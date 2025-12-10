@@ -1,4 +1,5 @@
 import { HelpCircle, Smartphone, Monitor, Apple } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -8,10 +9,19 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { analytics } from '@/lib/analytics';
 
 export function GPSTipsDialog() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      analytics.trackFeatureUsage('gps_tips');
+    }
+  }, [isOpen]);
+
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2 border-2 border-foreground">
           <HelpCircle className="h-4 w-4" />

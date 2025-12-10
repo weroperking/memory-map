@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Edit3, Download, Check, X, AlertCircle, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { prepareBatchDownload, batchDownloadFiles, validateMetadataValue } from '@/lib/metadata-editor';
 import { UpgradeModal } from './UpgradeModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { analytics } from '@/lib/analytics';
 
 interface MetadataEditorProps {
   isOpen: boolean;
@@ -29,6 +30,12 @@ export function MetadataEditor({ isOpen, onClose, isPro = false }: MetadataEdito
   const [isDownloading, setIsDownloading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState('select');
+
+  useEffect(() => {
+    if (isOpen) {
+      analytics.trackFeatureUsage('metadata_editor');
+    }
+  }, [isOpen]);
 
   const currentPhoto = selectedPhoto || photos[0];
   if (!currentPhoto) return null;
@@ -107,6 +114,7 @@ export function MetadataEditor({ isOpen, onClose, isPro = false }: MetadataEdito
         return;
       }
 
+      analytics.metadataEdit(photosToProcess.length);
       console.log(`[Download] Starting download process for ${photosToProcess.length} photos`);
       
       // Create metadata for each photo by merging original + edited values

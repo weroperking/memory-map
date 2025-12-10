@@ -5,6 +5,7 @@ import { usePhotos } from '@/contexts/PhotoContext';
 import { MapPin, Image, X, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoMetadata } from '@/lib/exif-utils';
+import { analytics, handleError } from '@/lib/analytics';
 
 type MapStyle = 'carto-light' | 'carto-dark' | 'osm' | 'satellite' | 'satellite-streets';
 
@@ -43,7 +44,7 @@ export function PhotoMap() {
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const { photos, selectPhoto } = usePhotos();
   const [hoveredCluster, setHoveredCluster] = useState<{ photos: PhotoMetadata[]; position: { x: number; y: number } } | null>(null);
-  const [mapStyle, setMapStyle] = useState<MapStyle>('carto-light');
+  const [mapStyle, setMapStyle] = useState<MapStyle>('carto-dark');
   const [showStyleMenu, setShowStyleMenu] = useState(false);
 
   const photosWithLocation = photos.filter((p) => p.latitude && p.longitude);
@@ -67,10 +68,10 @@ export function PhotoMap() {
       });
 
       // Add initial tile layer
-      updateTileLayer('carto-light');
+      updateTileLayer('carto-dark');
       setMapError(null);
     } catch (err) {
-      console.error('Error initializing map:', err);
+      handleError(err as Error, 'PhotoMap', { action: 'createMap' });
       setMapError('Failed to initialize map.');
     }
   };
@@ -107,6 +108,7 @@ export function PhotoMap() {
   // Handle map style changes
   useEffect(() => {
     updateTileLayer(mapStyle);
+    analytics.mapStyleChange(mapStyle);
   }, [mapStyle]);
 
   useEffect(() => {
@@ -183,7 +185,9 @@ r overflow-hidden transition-transform hover:-translate-x-0.5 hover:-translate-y
         </div>
       `;
 
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        analytics.logActivity('cluster_click', 'marker', undefined, { cluster_size: clusterPhotos.length });
         if (clusterPhotos.length === 1) {
           selectPhoto(clusterPhotos[0]);
         } else {

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { analytics, handleError } from '@/lib/analytics';
 
 interface AIDetectionResult {
   isAIGenerated: boolean;
@@ -27,18 +28,20 @@ interface AIDetectionPanelProps {
   onUpgrade?: () => void;
 }
 
-export function AIDetectionPanel({ imageUrl, imageName, isPro = true, onUpgrade }: AIDetectionPanelProps) {
+export function AIDetectionPanel({ imageUrl, imageName, isPro = true, onUpgrade }: AIDetectionPanelProps): JSX.Element {
   const [result, setResult] = useState<AIDetectionResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const runAnalysis = async () => {
     if (!isPro && onUpgrade) {
+      analytics.logActivity('upgrade_attempt', 'feature', undefined, { feature: 'ai_detection' });
       onUpgrade();
       return;
     }
 
     setIsAnalyzing(true);
     try {
+      analytics.trackFeatureUsage('ai_detection');
       // Convert image URL to base64
       const response = await fetch(imageUrl);
       const blob = await response.blob();
@@ -57,8 +60,9 @@ export function AIDetectionPanel({ imageUrl, imageName, isPro = true, onUpgrade 
       });
 
       if (error) {
-        console.error('AI detection error:', error);
-        toast.error('AI detection failed', { description: error.message });
+        handleError(new Error(error), 'AIDetectionPanel', { imageName });
+        toast.error('Analysis failed');
+        setIsAnalyzing(false);
         return;
       }
 

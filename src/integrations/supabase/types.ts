@@ -14,11 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          id: string
+          user_id: string
+          action: string
+          resource_type: string | null
+          resource_id: string | null
+          metadata: Json | null
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          action: string
+          resource_type?: string | null
+          resource_id?: string | null
+          metadata?: Json | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          action?: string
+          resource_type?: string | null
+          resource_id?: string | null
+          metadata?: Json | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      app_metrics: {
+        Row: {
+          id: string
+          metric_type: string
+          metric_value: number
+          tags: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          metric_type: string
+          metric_value: number
+          tags?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          metric_type?: string
+          metric_value?: number
+          tags?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      error_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          error_message: string
+          error_stack: string | null
+          component: string | null
+          severity: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          error_message: string
+          error_stack?: string | null
+          component?: string | null
+          severity?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          error_message?: string
+          error_stack?: string | null
+          component?: string | null
+          severity?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      feature_usage: {
+        Row: {
+          id: string
+          user_id: string
+          feature_name: string
+          usage_count: number
+          last_used_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          feature_name: string
+          usage_count?: number
+          last_used_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          feature_name?: string
+          usage_count?: number
+          last_used_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
           display_name: string | null
+          email: string | null
           id: string
           updated_at: string
           user_id: string
@@ -27,6 +145,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id?: string
           updated_at?: string
           user_id: string
@@ -35,9 +154,37 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      storage_usage: {
+        Row: {
+          id: string
+          user_id: string
+          total_bytes: number
+          photo_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          total_bytes: number
+          photo_count: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          total_bytes?: number
+          photo_count?: number
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

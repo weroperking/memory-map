@@ -1,5 +1,5 @@
 import { MapPin, Calendar, Camera, Aperture, Timer, Gauge, Maximize, HardDrive, Mountain, AlertCircle, Compass, Droplets, PenTool, Lock, Clock, Edit3 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { formatFileSize } from '@/lib/exif-utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,6 +8,7 @@ import { MetadataEditor } from './MetadataEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { analytics, handleError } from '@/lib/analytics';
 
 interface PhotoDetailProps {
   onUpgrade: () => void;
@@ -17,6 +18,15 @@ interface PhotoDetailProps {
 export function PhotoDetail({ onUpgrade, isPro = false }: PhotoDetailProps) {
   const { selectedPhoto, selectPhoto } = usePhotos();
   const [showEditor, setShowEditor] = useState(false);
+
+  useEffect(() => {
+    if (selectedPhoto) {
+      analytics.logActivity('photo_detail_view', 'photo', selectedPhoto.id, {
+        has_gps: !!(selectedPhoto.latitude && selectedPhoto.longitude),
+        camera: selectedPhoto.camera
+      });
+    }
+  }, [selectedPhoto]);
 
   if (!selectedPhoto) return null;
 
@@ -119,7 +129,19 @@ export function PhotoDetail({ onUpgrade, isPro = false }: PhotoDetailProps) {
                         )}
                       </div>
                       <Button
-                        onClick={() => (isPro ? setShowEditor(true) : onUpgrade())}
+                        onClick={() => {
+                          try {
+                            if (isPro) {
+                              analytics.logActivity('photo_edit_open', 'photo', selectedPhoto?.id);
+                              setShowEditor(true);
+                            } else {
+                              analytics.logActivity('upgrade_attempt', 'feature', undefined, { feature: 'metadata_editor' });
+                              onUpgrade();
+                            }
+                          } catch (error) {
+                            handleError(error as Error, 'PhotoDetail', { action: 'edit_click' });
+                          }
+                        }}
                         size="sm"
                         className="bg-chart-4 text-foreground hover:bg-chart-4/90"
                       >

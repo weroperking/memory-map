@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { PhotoUploader } from '@/components/PhotoUploader';
 import { PhotoGallery } from '@/components/PhotoGallery';
@@ -7,11 +7,16 @@ import { PhotoDetail } from '@/components/PhotoDetail';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { PhotoProvider } from '@/contexts/PhotoContext';
 import { useAuth } from '@/hooks/useAuth';
+import { logPageView } from '@/lib/analytics';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'gallery' | 'map'>('gallery');
   const [showUpgrade, setShowUpgrade] = useState(false);
   const { isPro, refreshSubscription } = useAuth();
+
+  useEffect(() => {
+    logPageView('dashboard', { view: activeView });
+  }, [activeView]);
 
   const handleUpgradeComplete = async () => {
     await refreshSubscription();

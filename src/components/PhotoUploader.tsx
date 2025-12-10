@@ -5,6 +5,7 @@ import { usePhotos } from '@/contexts/PhotoContext';
 import { FilePickerDialog } from './FilePickerDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
+import { analytics, handleError } from '@/lib/analytics';
 
 export function PhotoUploader() {
   const { addPhotos, isLoading, photos } = usePhotos();
@@ -30,13 +31,15 @@ export function PhotoUploader() {
           if (imageFiles.length > 0) {
             const dataTransfer = new DataTransfer();
             imageFiles.forEach(file => dataTransfer.items.add(file));
+            const totalSize = imageFiles.reduce((sum, f) => sum + f.size, 0);
             await addPhotos(dataTransfer.files);
+            analytics.photoUpload(imageFiles.length, totalSize);
           } else {
             toast.error('Please select image files');
           }
         }
       } catch (error) {
-        console.error('Error processing files:', error);
+        await handleError(error as Error, 'PhotoUploader', { action: 'file_change' });
         toast.error('Failed to process photos. Please try again.');
       } finally {
         e.target.value = '';
@@ -49,7 +52,9 @@ export function PhotoUploader() {
     async (e: React.DragEvent) => {
       e.preventDefault();
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const totalSize = Array.from(e.dataTransfer.files).reduce((sum, f) => sum + f.size, 0);
         await addPhotos(e.dataTransfer.files);
+        analytics.photoUpload(e.dataTransfer.files.length, totalSize);
       }
     },
     [addPhotos]

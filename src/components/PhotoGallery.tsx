@@ -1,6 +1,7 @@
 import { MapPin, Calendar, Camera } from 'lucide-react';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { PhotoMetadata } from '@/lib/exif-utils';
+import { analytics } from '@/lib/analytics';
 
 interface PhotoCardProps {
   photo: PhotoMetadata;
@@ -8,9 +9,14 @@ interface PhotoCardProps {
 }
 
 function PhotoCard({ photo, onClick }: PhotoCardProps) {
+  const handleClick = () => {
+    analytics.logActivity('photo_view', 'photo', photo.id);
+    onClick();
+  };
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className="group relative aspect-square overflow-hidden border-2 border-foreground bg-muted shadow-sm transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
     >
       <img

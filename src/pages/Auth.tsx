@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { analytics, handleError, logPageView } from '@/lib/analytics';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -26,7 +27,8 @@ export default function Auth() {
     if (user && !isLoading) {
       navigate('/');
     }
-  }, [user, isLoading, navigate]);
+    logPageView('auth', { mode: isLogin ? 'login' : 'signup' });
+  }, [user, isLoading, navigate, isLogin]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -56,18 +58,21 @@ export default function Auth() {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
+          await handleError(new Error(error.message), 'Auth', { action: 'signin' });
           if (error.message.includes('Invalid login credentials')) {
             toast.error('Invalid email or password');
           } else {
             toast.error(error.message);
           }
         } else {
+          analytics.logActivity('user_signin', 'auth');
           toast.success('Welcome back!');
           navigate('/');
         }
       } else {
         const { error } = await signUp(email, password, displayName);
         if (error) {
+          await handleError(new Error(error.message), 'Auth', { action: 'signup' });
           if (error.message.includes('User already registered')) {
             toast.error('This email is already registered. Please sign in instead.');
             setIsLogin(true);
@@ -75,6 +80,7 @@ export default function Auth() {
             toast.error(error.message);
           }
         } else {
+          analytics.logActivity('user_signup', 'auth', undefined, { display_name: displayName });
           toast.success('Account created! You can now sign in.');
           navigate('/');
         }

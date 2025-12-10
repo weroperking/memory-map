@@ -14,6 +14,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { analytics, logPageView } from '@/lib/analytics';
 
 interface HeaderProps {
   activeView: 'gallery' | 'map';
@@ -27,11 +28,13 @@ export function Header({ activeView, onViewChange, onUpgrade }: HeaderProps) {
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
+    analytics.logActivity('user_logout', 'auth');
     await signOut();
     setIsOpen(false);
   };
 
   const handleLogin = () => {
+    analytics.logActivity('user_login_attempt', 'auth');
     navigate('/auth');
     setIsOpen(false);
   };

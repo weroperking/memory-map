@@ -2,6 +2,8 @@ import { Check, Sparkles, X, Edit3, Package, Brain, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useEffect } from 'react';
+import { analytics } from '@/lib/analytics';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -46,6 +48,21 @@ const plans = [
 ];
 
 export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModalProps) {
+  useEffect(() => {
+    if (isOpen) {
+      analytics.upgradeView('modal');
+    }
+  }, [isOpen]);
+
+  const handleUpgrade = (plan: string) => {
+    const period = plans.find(p => p.name === plan)?.period || 'unknown';
+    analytics.upgradeComplete(plan, period);
+    if (onUpgradeComplete) {
+      onUpgradeComplete();
+    }
+    onClose();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] border-2 border-foreground p-0 shadow-lg overflow-hidden">
@@ -133,10 +150,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModa
                     )}
                   </div>
                   <Button
-                    onClick={() => {
-                      onUpgradeComplete?.();
-                      onClose();
-                    }}
+                    onClick={() => handleUpgrade(plan.name)}
                     className={`mt-3 sm:mt-4 w-full text-sm ${
                       plan.popular
                         ? 'bg-chart-4 text-foreground hover:bg-chart-4/90'
