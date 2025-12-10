@@ -242,10 +242,45 @@ background">                                                                    
           )}
 
           {/* Stats overlay */}
-          <div className="absolute left-4 top-4 flex items-center gap-2 border-2 border-foreground bg-background px-3 py-2 shadow-sm">                                                                                    <Image className="h-4 w-4" />
+          <div className="absolute left-4 top-4 z-30 flex items-center gap-2 border-2 border-foreground bg-background px-3 py-2 shadow-sm">
+            <Image className="h-4 w-4" />
             <span className="font-mono text-sm font-bold">
               {photosWithLocation.length} photos mapped
             </span>
+          </div>
+
+          {/* Map style selector */}
+          <div className="absolute right-4 top-4 z-30">
+            <div className="relative">
+              <Button
+                onClick={() => setShowStyleMenu(!showStyleMenu)}
+                variant="outline"
+                size="sm"
+                className="border-2 border-foreground gap-2"
+              >
+                <Layers className="h-4 w-4" />
+                <span className="font-mono text-sm">{MAP_STYLES[mapStyle].name}</span>
+              </Button>
+
+              {showStyleMenu && (
+                <div className="absolute right-0 mt-2 w-48 z-40 border-2 border-foreground bg-background shadow-lg">
+                  {(Object.entries(MAP_STYLES) as [MapStyle, typeof MAP_STYLES[MapStyle]][]).map(([key, style]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setMapStyle(key);
+                        setShowStyleMenu(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 border-b border-border hover:bg-muted transition-colors font-mono text-sm ${
+                        mapStyle === key ? 'bg-secondary font-bold' : ''
+                      }`}
+                    >
+                      {style.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Cluster popup */}
