@@ -93,21 +93,36 @@ export const trackFeatureUsage = async (featureName: string) => {
 /**
  * Update user's storage usage (call after photo upload/delete)
  */
-export const updateStorageUsage = async (userId: string) => {
+export const updateStorageUsage = async (userId?: string) => {
   try {
-    // If you have a photos table, query total size
-    // For now, this is a placeholder
-    const totalBytes = 0; // Calculate from your photos/storage table
-    const photoCount = 0;
+    let uid = userId;
+    if (!uid) {
+      const { data: { user } } = await supabase.auth.getUser();
+      uid = user?.id;
+    }
+    if (!uid) return;
+
+    const { data: photos, error: photosError } = await supabase
+      .from('photos')
+      .select('size')
+      .eq('user_id', uid);
+
+    if (photosError) {
+      console.error('Error fetching photos for storage calculation:', photosError);
+      return;
+    }
+
+    const totalBytes = (photos || []).reduce((sum: number, p: any) => sum + (Number(p.size) || 0), 0);
+    const photoCount = (photos || []).length;
 
     await supabase
       .from('storage_usage')
       .upsert({
-        user_id: userId,
+        user_id: uid,
         total_bytes: totalBytes,
         photo_count: photoCount,
         last_updated: new Date().toISOString(),
-      });
+      }, { onConflict: 'user_id' });
   } catch (err) {
     console.error('Error updating storage usage:', err);
   }
@@ -150,6 +165,8 @@ export const analytics = {
   
   // Feature usage
   featureUse: (featureName: string) => trackFeatureUsage(featureName),
+  // Storage
+  updateStorageUsage: updateStorageUsage,
 };
 
 /**

@@ -230,8 +230,7 @@ const updateStorageUsage = async (userId: string) => {
 Two views are provided for quick insights:
 
 ### `daily_active_users_view`
-```sql
-SELECT * FROM daily_active_users_view LIMIT 30;
+LSELECT * FROM daily_active_users_view LIMIT 30;
 -- Returns: activity_date, active_user_count, total_actions
 ```
 

@@ -34,6 +34,12 @@ export function PhotoUploader() {
             const totalSize = imageFiles.reduce((sum, f) => sum + f.size, 0);
             await addPhotos(dataTransfer.files);
             analytics.photoUpload(imageFiles.length, totalSize);
+            // update storage usage after successful upload
+            try {
+              await analytics.updateStorageUsage();
+            } catch (err) {
+              console.error('Failed to update storage usage after upload:', err);
+            }
           } else {
             toast.error('Please select image files');
           }
@@ -55,6 +61,11 @@ export function PhotoUploader() {
         const totalSize = Array.from(e.dataTransfer.files).reduce((sum, f) => sum + f.size, 0);
         await addPhotos(e.dataTransfer.files);
         analytics.photoUpload(e.dataTransfer.files.length, totalSize);
+        try {
+          await analytics.updateStorageUsage();
+        } catch (err) {
+          console.error('Failed to update storage usage after drop upload:', err);
+        }
       }
     },
     [addPhotos]
