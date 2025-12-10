@@ -121,7 +121,7 @@ Return your analysis as JSON with this exact structure:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "qwen/qwen2.5-vl",
+        model: "qwen/qwen3-vl-8b-instruct",
         messages: [
           { role: "system", content: systemPrompt },
           {
