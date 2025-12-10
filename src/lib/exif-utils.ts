@@ -188,32 +188,29 @@ export async function extractMetadata(file: File): Promise<PhotoMetadata> {
 
 export async function reverseGeocode(lat: number, lon: number): Promise<{ address: string; city?: string; state?: string; country?: string }> {
   try {
+    // Using OpenStreetMap Nominatim for reverse geocoding (free, no API key required)
     const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lon},${lat}.json?access_token=pk.eyJ1IjoibG92YWJsZS1kZW1vIiwiYSI6ImNtNXN6Z3A2bDBsMW8yanM2aG15cDVlbHIifQ.sk0KbXhxCHPvqOWVYR-qcg`
-    );
-    const data = await response.json();
-    if (data.features && data.features.length > 0) {
-      const feature = data.features[0];
-      const address = feature.place_name;
-      
-      // Extract city, state, country from context
-      let city: string | undefined;
-      let state: string | undefined;
-      let country: string | undefined;
-      
-      // Parse context to get region info
-      if (feature.context) {
-        feature.context.forEach((ctx: any) => {
-          if (ctx.id.includes('place')) city = ctx.text;
-          if (ctx.id.includes('region')) state = ctx.text;
-          if (ctx.id.includes('country')) country = ctx.text;
-        });
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      {
+        headers: {
+          'User-Agent': 'memory-map-app (https://github.com/weroperking/memory-map)'
+        }
       }
+    );
+    
+    const data = await response.json();
+    if (data && data.address) {
+      const addr = data.address;
+      const address = data.display_name || 'Unknown Location';
+      const city = addr.city || addr.town || addr.village || undefined;
+      const state = addr.state || undefined;
+      const country = addr.country || undefined;
       
       return { address, city, state, country };
     }
     return { address: 'Unknown Location' };
-  } catch {
+  } catch (err) {
+    console.error('Nominatim reverse geocoding error:', err);
     return { address: 'Unknown Location' };
   }
 }
