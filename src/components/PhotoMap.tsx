@@ -1,58 +1,116 @@
 import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { usePhotos } from '@/contexts/PhotoContext';
-import { MapPin, Image, X, Loader2 } from 'lucide-react';
+import { MapPin, Image, X, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoMetadata } from '@/lib/exif-utils';
 
-mapboxgl.accessToken = 'pk.eyJ1IjoibG92YWJsZS1kZW1vIiwiYSI6ImNtNXN6Z3A2bDBsMW8yanM2aG15cDVlbHIifQ.sk0KbXhxCHPvqOWVYR-qcg';
+type MapStyle = 'carto-light' | 'carto-dark' | 'osm' | 'satellite' | 'satellite-streets';
+
+const MAP_STYLES: Record<MapStyle, { name: string; url: string; attribution: string }> = {
+  'carto-light': {
+    name: 'Carto Light',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  },
+  'carto-dark': {
+    name: 'Carto Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  },
+  osm: {
+    name: 'OpenStreetMap',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+  },
+  'satellite': {
+    name: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri &copy; DigitalGlobe &copy; Earthstar Geographics',
+  },
+  'satellite-streets': {
+    name: 'Satellite + Streets',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri',
+  },
+};
 
 export function PhotoMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const map = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const { photos, selectPhoto } = usePhotos();
   const [hoveredCluster, setHoveredCluster] = useState<{ photos: PhotoMetadata[]; position: { x: number; y: number } } | null>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapStyle, setMapStyle] = useState<MapStyle>('carto-light');
+  const [showStyleMenu, setShowStyleMenu] = useState(false);
 
   const photosWithLocation = photos.filter((p) => p.latitude && p.longitude);
 
-  useEffect(() => {
-    if (!mapContainer.current) return;
+  const [mapError, setMapError] = useState<string | null>(null);
 
+  // Initialize or re-initialize map
+  const createMap = () => {
+    if (!mapContainer.current) return;
     try {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/dark-v11',
-        center: [0, 20],
+      // Remove existing map if present
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+
+      // Create Leaflet map
+      map.current = L.map(mapContainer.current, {
+        center: [20, 0],
         zoom: 1.5,
       });
 
-      map.current.on('load', () => {
-        setIsMapLoaded(true);
-      });
-
-      map.current.on('error', (e) => {
-        console.error('Mapbox error:', e);
-        setMapError('Failed to load map. Please try again.');
-      });
-
-      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      // Add initial tile layer
+      updateTileLayer('carto-light');
+      setMapError(null);
     } catch (err) {
-      console.error('Map initialization error:', err);
+      console.error('Error initializing map:', err);
       setMapError('Failed to initialize map.');
     }
+  };
+
+  // Update tile layer without recreating the map
+  const updateTileLayer = (style: MapStyle) => {
+    if (!map.current) return;
+
+    const styleConfig = MAP_STYLES[style];
+
+    // Remove existing tile layer
+    if (tileLayerRef.current) {
+      map.current.removeLayer(tileLayerRef.current);
+    }
+
+    // Add new tile layer
+    tileLayerRef.current = L.tileLayer(styleConfig.url, {
+      attribution: styleConfig.attribution,
+      maxZoom: 20,
+    }).addTo(map.current);
+  };
+
+  useEffect(() => {
+    createMap();
 
     return () => {
-      map.current?.remove();
-      map.current = null;
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
   }, []);
 
+  // Handle map style changes
   useEffect(() => {
-    if (!map.current || !isMapLoaded) return;
+    updateTileLayer(mapStyle);
+  }, [mapStyle]);
+
+  useEffect(() => {
+    if (!map.current) return;
 
     // Clear existing markers
     markersRef.current.forEach((marker) => marker.remove());
@@ -60,51 +118,77 @@ export function PhotoMap() {
 
     if (photosWithLocation.length === 0) return;
 
-    // Group photos by approximate location (clustering)
+    // Helper function to calculate distance between two points (in meters)
+    const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371000; // Earth's radius in meters
+      const φ1 = (lat1 * Math.PI) / 180;
+      const φ2 = (lat2 * Math.PI) / 180;
+      const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+      const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    // Group photos using distance-based clustering (100m tolerance)
     const clusters = new Map<string, PhotoMetadata[]>();
+    const clusterCenters = new Map<string, { lat: number; lng: number }>();
+    const CLUSTER_DISTANCE = 100; // meters
+
     photosWithLocation.forEach((photo) => {
-      const key = `${photo.latitude!.toFixed(2)},${photo.longitude!.toFixed(2)}`;
-      if (!clusters.has(key)) {
-        clusters.set(key, []);
+      const lat = photo.latitude!;
+      const lng = photo.longitude!;
+      let assignedCluster = false;
+
+      // Check if photo is close enough to existing cluster
+      for (const [clusterId, center] of clusterCenters.entries()) {
+        const distance = getDistance(lat, lng, center.lat, center.lng);
+        if (distance <= CLUSTER_DISTANCE) {
+          clusters.get(clusterId)!.push(photo);
+          assignedCluster = true;
+          break;
+        }
       }
-      clusters.get(key)!.push(photo);
+
+      // Create new cluster if not close to existing ones
+      if (!assignedCluster) {
+        const clusterId = `${clusters.size}`;
+        clusters.set(clusterId, [photo]);
+        clusterCenters.set(clusterId, { lat, lng });
+      }
     });
 
     // Create markers for each cluster
-    clusters.forEach((clusterPhotos) => {
+    clusters.forEach((clusterPhotos, clusterId) => {
+      // Calculate cluster center (average of all photos in cluster)
+      const avgLat = clusterPhotos.reduce((sum, p) => sum + p.latitude!, 0) / clusterPhotos.length;
+      const avgLng = clusterPhotos.reduce((sum, p) => sum + p.longitude!, 0) / clusterPhotos.length;
+      
       const firstPhoto = clusterPhotos[0];
 
-      // Create custom marker element with brutalist square style
+      // Create custom marker element
       const el = document.createElement('div');
       el.className = 'photo-marker';
-      el.style.cssText = 'cursor: pointer;';
-      
       el.innerHTML = `
-        <div style="position: relative; transition: transform 0.2s;">
-          <div style="width: 56px; height: 56px; border: 3px solid white; background: #1a1a1a; box-shadow: 0 4px 12px rgba(0,0,0,0.5); overflow: hidden;">
-            <img src="${firstPhoto.url}" style="width: 100%; height: 100%; object-fit: cover;" alt="${firstPhoto.name}" />
+        <div class="relative cursor-pointer group">
+          <div class="w-12 h-12 border-2 border-black bg-white shadow-sm flex items-center justify-cente
+r overflow-hidden transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-md">              <img src="${firstPhoto.url}" class="w-full h-full object-cover" />
           </div>
           ${clusterPhotos.length > 1 ? `
-            <div style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: #f97316; color: white; font-size: 11px; font-weight: bold; font-family: monospace; display: flex; align-items: center; justify-content: center; border: 2px solid white;">
-              ${clusterPhotos.length}
+            <div class="absolute -top-2 -right-2 w-6 h-6 bg-black text-white text-xs font-mono font-bold
+ flex items-center justify-center border-2 border-white">                                                             ${clusterPhotos.length}
             </div>
           ` : ''}
         </div>
       `;
 
-      el.addEventListener('mouseenter', () => {
-        el.style.transform = 'scale(1.1)';
-      });
-
-      el.addEventListener('mouseleave', () => {
-        el.style.transform = 'scale(1)';
-      });
-
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
+      el.addEventListener('click', () => {
         if (clusterPhotos.length === 1) {
           selectPhoto(clusterPhotos[0]);
         } else {
+          // Zoom to cluster at level 18 for street-level detail
+          map.current!.setView([avgLat, avgLng], 18, { animate: true });
           const rect = el.getBoundingClientRect();
           setHoveredCluster({
             photos: clusterPhotos,
@@ -113,57 +197,32 @@ export function PhotoMap() {
         }
       });
 
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([firstPhoto.longitude!, firstPhoto.latitude!])
-        .addTo(map.current!);
+      // Create Leaflet marker with custom icon
+      const marker = L.marker([avgLat, avgLng], {
+        icon: L.divIcon({
+          html: el.innerHTML,
+          className: '',
+          iconSize: [48, 48],
+          iconAnchor: [24, 24],
+        }),
+      }).addTo(map.current!);
 
       markersRef.current.push(marker);
     });
 
-    // Fit map to show all markers with padding
-    if (photosWithLocation.length > 0) {
-      const bounds = new mapboxgl.LngLatBounds();
-      photosWithLocation.forEach((photo) => {
-        bounds.extend([photo.longitude!, photo.latitude!]);
-      });
-      
-      map.current.fitBounds(bounds, { 
-        padding: { top: 80, bottom: 80, left: 80, right: 80 }, 
-        maxZoom: 12,
-        duration: 1000
-      });
+    // Fit map to show all markers
+    if (photosWithLocation.length > 0 && markersRef.current.length > 0) {
+      const group = new L.FeatureGroup(markersRef.current);
+      map.current.fitBounds(group.getBounds(), { padding: [50, 50] });
     }
-  }, [photosWithLocation, selectPhoto, isMapLoaded]);
-
-  // Close cluster popup when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => setHoveredCluster(null);
-    if (hoveredCluster) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [hoveredCluster]);
-
-  if (mapError) {
-    return (
-      <div className="relative h-[calc(100vh-12rem)] border-2 border-foreground">
-        <div className="flex h-full flex-col items-center justify-center bg-muted p-8 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center border-2 border-destructive bg-background">
-            <MapPin className="h-8 w-8 text-destructive" />
-          </div>
-          <h3 className="mb-2 font-mono text-xl font-bold">Map Error</h3>
-          <p className="text-muted-foreground">{mapError}</p>
-        </div>
-      </div>
-    );
-  }
+  }, [photosWithLocation, selectPhoto]);
 
   return (
     <div className="relative h-[calc(100vh-12rem)] border-2 border-foreground">
       {photosWithLocation.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center bg-muted p-8 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center border-2 border-foreground bg-background">
-            <MapPin className="h-8 w-8 text-muted-foreground" />
+          <div className="mb-4 flex h-16 w-16 items-center justify-center border-2 border-foreground bg-
+background">                                                                                                        <MapPin className="h-8 w-8 text-muted-foreground" />
           </div>
           <h3 className="mb-2 font-mono text-xl font-bold">No photos with location</h3>
           <p className="text-muted-foreground">
@@ -172,18 +231,18 @@ export function PhotoMap() {
         </div>
       ) : (
         <>
-          <div ref={mapContainer} className="h-full w-full" />
-          
-          {/* Loading overlay */}
-          {!isMapLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-              <Loader2 className="h-8 w-8 animate-spin" />
+          <div ref={mapContainer} className={`h-full w-full z-0 transition-opacity ${hoveredCluster ? 'opacity-60' : 'opacity-100'}`} />
+          {/* Map error overlay */}
+          {mapError && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/80 p-4 text-center">                                                                                                <div className="mb-3 text-sm font-mono font-bold">{mapError}</div>
+              <div className="flex gap-2">
+                <Button onClick={() => { setMapError(null); createMap(); }} className="border-2">Retry</Button>
+              </div>
             </div>
           )}
-          
+
           {/* Stats overlay */}
-          <div className="absolute left-4 top-4 flex items-center gap-2 border-2 border-foreground bg-background px-3 py-2 shadow-lg">
-            <Image className="h-4 w-4" />
+          <div className="absolute left-4 top-4 flex items-center gap-2 border-2 border-foreground bg-background px-3 py-2 shadow-sm">                                                                                    <Image className="h-4 w-4" />
             <span className="font-mono text-sm font-bold">
               {photosWithLocation.length} photos mapped
             </span>
@@ -194,12 +253,11 @@ export function PhotoMap() {
             <div
               className="fixed z-50 -translate-x-1/2 -translate-y-full"
               style={{ left: hoveredCluster.position.x, top: hoveredCluster.position.y - 10 }}
-              onClick={(e) => e.stopPropagation()}
             >
-              <div className="border-2 border-foreground bg-background p-3 shadow-lg max-w-xs">
+              <div className="border-2 border-foreground bg-background p-3 shadow-md">
                 <div className="mb-2 flex items-center justify-between gap-4">
                   <span className="font-mono text-sm font-bold">
-                    {hoveredCluster.photos.length} photos at this location
+                    {hoveredCluster.photos.length} photos
                   </span>
                   <Button
                     variant="ghost"
@@ -218,7 +276,7 @@ export function PhotoMap() {
                         selectPhoto(photo);
                         setHoveredCluster(null);
                       }}
-                      className="aspect-square overflow-hidden border-2 border-foreground transition-all hover:scale-105 hover:shadow-md"
+                      className="aspect-square overflow-hidden border border-foreground transition-opacity hover:opacity-80"
                     >
                       <img
                         src={photo.url}
