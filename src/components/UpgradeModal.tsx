@@ -1,4 +1,4 @@
-import { Check, Sparkles, Zap, Shield, Download, Brain, X, Edit3, Package } from 'lucide-react';
+import { Check, Sparkles, X, Edit3, Package, Brain, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -48,101 +48,113 @@ const plans = [
 export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl border-2 border-foreground p-0 shadow-lg">
-        <div className="relative bg-gradient-to-br from-chart-4/30 via-background to-chart-2/20 p-6">
-          <DialogHeader className="mb-6">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center border-2 border-foreground bg-chart-4 shadow-sm">
-              <Sparkles className="h-8 w-8" />
-            </div>
-            <DialogTitle className="text-center font-mono text-2xl">
-              Unlock PhotoMap Pro
-            </DialogTitle>
-            <p className="text-center text-muted-foreground">
-              Get access to powerful features and take your photo organization to the next level
-            </p>
-          </DialogHeader>
+      <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] border-2 border-foreground p-0 shadow-lg overflow-hidden">
+        {/* Close button for mobile */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-2 z-50 h-8 w-8 bg-background/80 backdrop-blur-sm border border-foreground md:hidden"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+        
+        <ScrollArea className="max-h-[90vh]">
+          <div className="relative bg-gradient-to-br from-chart-4/30 via-background to-chart-2/20 p-4 sm:p-6">
+            <DialogHeader className="mb-4 sm:mb-6">
+              <div className="mx-auto mb-3 sm:mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center border-2 border-foreground bg-chart-4 shadow-sm">
+                <Sparkles className="h-6 w-6 sm:h-8 sm:w-8" />
+              </div>
+              <DialogTitle className="text-center font-mono text-xl sm:text-2xl">
+                Unlock PhotoMap Pro
+              </DialogTitle>
+              <p className="text-center text-sm text-muted-foreground">
+                Get access to powerful features and take your photo organization to the next level
+              </p>
+            </DialogHeader>
 
-          {/* Main Features */}
-          <div className="mb-8">
-            <h3 className="text-sm font-mono font-bold uppercase text-foreground mb-4">✨ Premium Features</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {mainFeatures.map(({ icon: Icon, text }) => (
-                <div
-                  key={text}
-                  className="flex items-center gap-3 border-2 border-chart-4 bg-chart-4/5 p-3 rounded hover:bg-chart-4/10 transition-colors"
-                >
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 border-chart-4 bg-chart-4 text-foreground rounded">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <span className="text-sm font-medium">{text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Metadata Fields */}
-          <div className="mb-8">
-            <h3 className="text-sm font-mono font-bold uppercase text-foreground mb-4">📊 Access 13 Premium Metadata Fields</h3>
-            <div className="border-2 border-chart-4 bg-chart-4/5 rounded p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {premiumMetadataFields.map((field) => (
-                  <div key={field} className="flex items-center gap-2 text-sm">
-                    <Check className="h-4 w-4 text-chart-4 flex-shrink-0" />
-                    <span className="text-muted-foreground">{field}</span>
+            {/* Main Features */}
+            <div className="mb-6 sm:mb-8">
+              <h3 className="text-xs sm:text-sm font-mono font-bold uppercase text-foreground mb-3 sm:mb-4">✨ Premium Features</h3>
+              <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2">
+                {mainFeatures.map(({ icon: Icon, text }) => (
+                  <div
+                    key={text}
+                    className="flex items-center gap-2 sm:gap-3 border-2 border-chart-4 bg-chart-4/5 p-2 sm:p-3 rounded hover:bg-chart-4/10 transition-colors"
+                  >
+                    <div className="flex h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 items-center justify-center border-2 border-chart-4 bg-chart-4 text-foreground rounded">
+                      <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </div>
+                    <span className="text-xs sm:text-sm font-medium">{text}</span>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
 
-          {/* Pricing */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            {plans.map((plan) => (
-              <div
-                key={plan.name}
-                className={`relative border-2 border-foreground bg-background p-4 transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-md ${
-                  plan.popular ? 'shadow-sm ring-2 ring-chart-4' : ''
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-chart-4 px-2 py-0.5 text-xs font-mono font-bold">
-                    MOST POPULAR
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="font-mono text-sm text-muted-foreground">{plan.name}</p>
-                  <div className="my-2">
-                    <span className="font-mono text-3xl font-bold">{plan.price}</span>
-                    <span className="text-sm text-muted-foreground">{plan.period}</span>
-                  </div>
-                  {plan.savings && (
-                    <span className="inline-block bg-chart-2 px-2 py-0.5 text-xs font-bold text-primary-foreground">
-                      {plan.savings}
-                    </span>
-                  )}
+            {/* Metadata Fields */}
+            <div className="mb-6 sm:mb-8">
+              <h3 className="text-xs sm:text-sm font-mono font-bold uppercase text-foreground mb-3 sm:mb-4">📊 Access 13 Premium Metadata Fields</h3>
+              <div className="border-2 border-chart-4 bg-chart-4/5 rounded p-3 sm:p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+                  {premiumMetadataFields.map((field) => (
+                    <div key={field} className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                      <Check className="h-3 w-3 sm:h-4 sm:w-4 text-chart-4 flex-shrink-0" />
+                      <span className="text-muted-foreground truncate">{field}</span>
+                    </div>
+                  ))}
                 </div>
-                <Button
-                  onClick={() => {
-                    onUpgradeComplete?.();
-                    onClose();
-                  }}
-                  className={`mt-4 w-full ${
-                    plan.popular
-                      ? 'bg-chart-4 text-foreground hover:bg-chart-4/90'
-                      : ''
-                  } border-2 border-foreground`}
-                  variant={plan.popular ? 'default' : 'outline'}
-                >
-                  Choose {plan.name}
-                </Button>
               </div>
-            ))}
-          </div>
+            </div>
 
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            All plans include a 7-day money-back guarantee
-          </p>
-        </div>
+            {/* Pricing */}
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+              {plans.map((plan) => (
+                <div
+                  key={plan.name}
+                  className={`relative border-2 border-foreground bg-background p-3 sm:p-4 transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-md ${
+                    plan.popular ? 'shadow-sm ring-2 ring-chart-4' : ''
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-chart-4 px-2 py-0.5 text-xs font-mono font-bold whitespace-nowrap">
+                      MOST POPULAR
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <p className="font-mono text-xs sm:text-sm text-muted-foreground">{plan.name}</p>
+                    <div className="my-1.5 sm:my-2">
+                      <span className="font-mono text-2xl sm:text-3xl font-bold">{plan.price}</span>
+                      <span className="text-xs sm:text-sm text-muted-foreground">{plan.period}</span>
+                    </div>
+                    {plan.savings && (
+                      <span className="inline-block bg-chart-2 px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                        {plan.savings}
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => {
+                      onUpgradeComplete?.();
+                      onClose();
+                    }}
+                    className={`mt-3 sm:mt-4 w-full text-sm ${
+                      plan.popular
+                        ? 'bg-chart-4 text-foreground hover:bg-chart-4/90'
+                        : ''
+                    } border-2 border-foreground`}
+                    variant={plan.popular ? 'default' : 'outline'}
+                  >
+                    Choose {plan.name}
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-4 sm:mt-6 text-center text-xs text-muted-foreground">
+              All plans include a 7-day money-back guarantee
+            </p>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
