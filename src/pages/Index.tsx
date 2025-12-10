@@ -6,11 +6,16 @@ import { PhotoMap } from '@/components/PhotoMap';
 import { PhotoDetail } from '@/components/PhotoDetail';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { PhotoProvider } from '@/contexts/PhotoContext';
+import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'gallery' | 'map'>('gallery');
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [isPro, setIsPro] = useState(false);
+  const { isPro, refreshSubscription } = useAuth();
+
+  const handleUpgradeComplete = async () => {
+    await refreshSubscription();
+  };
 
   return (
     <PhotoProvider>
@@ -28,7 +33,11 @@ const Index = () => {
         </main>
 
         <PhotoDetail onUpgrade={() => setShowUpgrade(true)} isPro={isPro} />
-        <UpgradeModal isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgradeComplete={() => setIsPro(true)} />
+        <UpgradeModal 
+          isOpen={showUpgrade} 
+          onClose={() => setShowUpgrade(false)} 
+          onUpgradeComplete={handleUpgradeComplete} 
+        />
       </div>
     </PhotoProvider>
   );
