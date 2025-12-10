@@ -5,6 +5,29 @@
   text-align: center;
 }
 
+/* Leaflet map z-index fixes */
+.leaflet-container {
+  z-index: 0;
+}
+
+.leaflet-control {
+  z-index: 10;
+}
+
+.leaflet-pane {
+  z-index: 1;
+}
+
+.leaflet-popup {
+  z-index: 20;
+}
+
+/* Ensure Leaflet doesn't block UI overlays */
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 30;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;
