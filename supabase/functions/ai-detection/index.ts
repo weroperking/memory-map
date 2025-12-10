@@ -1,9 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
+
+// Rate limit config
+const MAX_REQUESTS_PER_MIN = 8;
+
+// in-memory rate map
+const rateMap = new Map<string, { count: number; timestamp: number }>();
+
+// Supabase client
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,21 +25,56 @@ serve(async (req) => {
   }
 
   try {
+    // -----------------------------
+    //  RATE LIMIT
+    // -----------------------------
+    const ip = req.headers.get("x-forwarded-for") || "unknown";
+    const now = Date.now();
+    const record = rateMap.get(ip);
+
+    if (record) {
+      const diff = now - record.timestamp;
+
+      if (diff < 60_000) {
+        if (record.count >= MAX_REQUESTS_PER_MIN) {
+          return new Response(
+            JSON.stringify({
+              error: "Rate limit exceeded. Try again in 60 seconds.",
+            }),
+            {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+        record.count++;
+      } else {
+        rateMap.set(ip, { count: 1, timestamp: now });
+      }
+    } else {
+      rateMap.set(ip, { count: 1, timestamp: now });
+    }
+
+    // -----------------------------
+    //  PARSE REQUEST
+    // -----------------------------
     const { imageBase64, imageName } = await req.json();
     if (!imageBase64) {
-      return new Response(
-        JSON.stringify({ error: "No image provided" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "No image provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const GEMINI_API = Deno.env.get("GEMINI_API");
-    if (!GEMINI_API) {
-      throw new Error("GEMINI_API is not configured");
-    }
+    // -----------------------------
+    //  ENV
+    // -----------------------------
+    const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
+    if (!OPENROUTER_KEY) throw new Error("OPENROUTER_KEY not configured");
 
-    console.log("Analyzing image:", imageName);
-
+    // -----------------------------
+    // FULL SYSTEM PROMPT YOU WROTE — UNCHANGED
+    // -----------------------------
     const systemPrompt = `You are an expert AI image forensics analyst. Your task is to analyze images and determine if they are AI-generated or authentic photographs.
 
 Analyze the following aspects:
@@ -54,122 +103,102 @@ Return your analysis as JSON with this exact structure:
   "details": string
 }`;
 
-    const userMessageText = `Analyze this image and determine if it is AI-generated or an authentic photograph. Provide detailed forensic analysis.`;
+    const userMessageText =
+      "Analyze this image and determine if it is AI-generated or an authentic photograph. Provide detailed forensic analysis.";
 
-    // Extract base64 data (remove data URI prefix if present)
-    const imageData = imageBase64.startsWith("data:") ? imageBase64.split(",")[1] : imageBase64;
+    // remove dataURI prefix
+    const imageData = imageBase64.startsWith("data:")
+      ? imageBase64.split(",")[1]
+      : imageBase64;
 
-    // Call Google Generative AI REST API (Gemini 2.0 Flash)
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: {
-              text: systemPrompt,
-            },
-          },
-          contents: {
-            parts: [
+    // -----------------------------
+    //  CALL QWEN2.5 VL (OPENROUTER)
+    // -----------------------------
+    const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "qwen/qwen2.5-vl",
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: userMessageText },
               {
-                text: userMessageText,
-              },
-              {
-                inline_data: {
-                  mime_type: "image/jpeg",
-                  data: imageData,
-                },
+                type: "input_image",
+                image_url: `data:image/jpeg;base64,${imageData}`,
               },
             ],
           },
-          generation_config: {
-            max_output_tokens: 1024,
-          },
-        }),
-      }
-    );
+        ],
+        max_tokens: 2048,
+        temperature: 0,
+      }),
+    });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Google Generative AI error:", response.status, errorText);
-
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (response.status === 401 || response.status === 403) {
-        return new Response(
-          JSON.stringify({ error: "Invalid GEMINI_API key. Check your configuration." }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      throw new Error(`Google Generative AI error: ${response.status}`);
+    if (!orRes.ok) {
+      const t = await orRes.text();
+      console.error("OpenRouter error:", t);
+      return new Response(JSON.stringify({ error: "Model call failed." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const modelData = await orRes.json();
+    const content = modelData?.choices?.[0]?.message?.content;
 
-    if (!content) {
-      throw new Error("No response from AI model");
-    }
-
-    console.log("AI response:", content);
-
-    // Parse JSON from response
+    // -----------------------------
+    // PARSE JSON
+    // -----------------------------
     let result;
     try {
-      // Extract JSON from response (might be wrapped in markdown code blocks)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("No JSON found in response");
-      }
-    } catch (parseError) {
-      console.error("Parse error:", parseError);
-      // Return a default response if parsing fails
+      const match = content.match(/\{[\s\S]*\}/);
+      result = JSON.parse(match[0]);
+    } catch {
       result = {
         isAIGenerated: false,
         confidence: 50,
-        reasons: [
-          "Analysis completed but results were inconclusive"
-        ],
+        reasons: ["Could not parse response JSON"],
         analysis: {
           noiseScore: 50,
           edgeScore: 50,
           textureScore: 50,
           anatomyScore: 50,
           lightingScore: 50,
-          overallScore: 50
+          overallScore: 50,
         },
-        details: content || "Unable to parse AI response"
+        details: content ?? "No valid JSON returned",
       };
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json"
-      }
+    // -----------------------------
+    // SAVE LOGS
+    // -----------------------------
+    await supabase.from("ai_logs").insert({
+      ip,
+      image_name: imageName ?? null,
+      model: "qwen2.5-vl",
+      confidence: result.confidence,
+      is_ai: result.isAIGenerated,
+      raw_output: result,
     });
-  } catch (error) {
-    console.error("Error in ai-detection:", error);
-    return new Response(JSON.stringify({
-      error: error instanceof Error ? error.message : "Unknown error"
-    }), {
+
+    // -----------------------------
+    // RETURN RESULT
+    // -----------------------------
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("Edge error:", e);
+    return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json"
-      }
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
