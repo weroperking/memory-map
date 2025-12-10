@@ -86,7 +86,7 @@ CREATE TABLE public.storage_usage (
   user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   total_bytes BIGINT NOT NULL DEFAULT 0,
   photo_count INT NOT NULL DEFAULT 0,
-  last_updated TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
 -- Index for storage queries
