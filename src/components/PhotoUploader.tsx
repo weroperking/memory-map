@@ -1,21 +1,44 @@
 import { useCallback, useRef, useState } from 'react';
-import { Upload, ImagePlus, Loader2, Camera, Folder } from 'lucide-react';
+import { Upload, ImagePlus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePhotos } from '@/contexts/PhotoContext';
 import { FilePickerDialog } from './FilePickerDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
 
 export function PhotoUploader() {
   const { addPhotos, isLoading, photos } = usePhotos();
   const [showPicker, setShowPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const browseFilesRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-        await addPhotos(e.target.files);
+      try {
+        if (e.target.files && e.target.files.length > 0) {
+          // Filter only image files
+          const imageFiles: File[] = [];
+          for (let i = 0; i < e.target.files.length; i++) {
+            const file = e.target.files[i];
+            if (file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(file.name)) {
+              imageFiles.push(file);
+            }
+          }
+          
+          if (imageFiles.length > 0) {
+            const dataTransfer = new DataTransfer();
+            imageFiles.forEach(file => dataTransfer.items.add(file));
+            await addPhotos(dataTransfer.files);
+          } else {
+            toast.error('Please select image files');
+          }
+        }
+      } catch (error) {
+        console.error('Error processing files:', error);
+        toast.error('Failed to process photos. Please try again.');
+      } finally {
         e.target.value = '';
       }
     },
@@ -45,11 +68,19 @@ export function PhotoUploader() {
   };
 
   const handleCameraSelect = () => {
-    cameraInputRef.current?.click();
+    setShowPicker(false);
+    // Small delay to ensure dialog closes first
+    setTimeout(() => {
+      cameraInputRef.current?.click();
+    }, 100);
   };
 
   const handleFilesSelect = () => {
-    fileInputRef.current?.click();
+    setShowPicker(false);
+    // Small delay to ensure dialog closes first
+    setTimeout(() => {
+      browseFilesRef.current?.click();
+    }, 100);
   };
 
   if (photos.length === 0) {
@@ -78,7 +109,7 @@ export function PhotoUploader() {
                 }
               </p>
               
-              {/* Hidden inputs */}
+              {/* Standard file input for desktop */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -87,11 +118,22 @@ export function PhotoUploader() {
                 onChange={handleFileChange}
                 className="hidden"
               />
+              
+              {/* Camera input - captures photo directly */}
               <input
                 ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              
+              {/* Browse files input - NO accept attribute to open native file browser */}
+              <input
+                ref={browseFilesRef}
+                type="file"
+                multiple
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -129,7 +171,7 @@ export function PhotoUploader() {
           {isLoading && <Loader2 className="h-5 w-5 animate-spin" />}
         </div>
         
-        {/* Hidden inputs */}
+        {/* Standard file input for desktop */}
         <input
           ref={fileInputRef}
           type="file"
@@ -138,11 +180,22 @@ export function PhotoUploader() {
           onChange={handleFileChange}
           className="hidden"
         />
+        
+        {/* Camera input */}
         <input
           ref={cameraInputRef}
           type="file"
           accept="image/*"
           capture="environment"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        
+        {/* Browse files input - NO accept attribute */}
+        <input
+          ref={browseFilesRef}
+          type="file"
+          multiple
           onChange={handleFileChange}
           className="hidden"
         />
