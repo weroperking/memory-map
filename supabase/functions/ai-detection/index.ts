@@ -182,7 +182,7 @@ Return your analysis as JSON with this exact structure:
     await supabase.from("ai_logs").insert({
       ip,
       image_name: imageName ?? null,
-      model: "qwen2.5-vl",
+      model: "qwen3-vl-8b-instruct",
       confidence: result.confidence,
       is_ai: result.isAIGenerated,
       raw_output: result,
