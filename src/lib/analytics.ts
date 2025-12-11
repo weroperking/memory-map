@@ -1,130 +1,28 @@
 /**
  * Analytics & Monitoring Utilities
- * Log user activity, errors, and feature usage to Supabase
+ * Simple client-side analytics (no database dependencies)
  */
-
-import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Log a user activity event (photo upload, feature use, view, etc.)
+ * Log activity to console (can be extended to send to analytics service)
  */
-export const logActivity = async (
+const logActivity = (
   action: string,
   resourceType?: string,
-  resourceId?: string,
-  metadata?: Record<string, any>
+  _resourceId?: string,
+  metadata?: Record<string, unknown>
 ) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase.from('activity_logs').insert({
-      user_id: user.id,
-      action,
-      resource_type: resourceType,
-      resource_id: resourceId,
-      metadata,
-      ip_address: undefined, // Will be captured server-side if needed
-      user_agent: navigator.userAgent,
-    });
-  } catch (err) {
-    console.error('Error logging activity:', err);
+  if (import.meta.env.DEV) {
+    console.log('[Analytics]', action, resourceType, metadata);
   }
 };
 
 /**
- * Log an error event for debugging and monitoring
+ * Track feature usage
  */
-export const logError = async (
-  error: Error | string,
-  component: string,
-  severity: 'error' | 'warning' | 'critical' = 'error',
-  metadata?: Record<string, any>
-) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const errorMessage = typeof error === 'string' ? error : error.message;
-    const errorStack = typeof error === 'string' ? undefined : error.stack;
-
-    await supabase.from('error_logs').insert({
-      user_id: user?.id,
-      error_message: errorMessage,
-      error_stack: errorStack,
-      component,
-      severity,
-      metadata,
-    });
-  } catch (err) {
-    console.error('Error logging error:', err);
-  }
-};
-
-/**
- * Track feature usage for product analytics
- */
-export const trackFeatureUsage = async (featureName: string) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('feature_usage')
-      .upsert(
-        {
-          user_id: user.id,
-          feature_name: featureName,
-          last_used_at: new Date().toISOString(),
-          usage_count: 1, // Will be incremented by trigger or separate logic
-        },
-        {
-          onConflict: 'user_id,feature_name',
-        }
-      );
-
-    if (error) {
-      console.error('Error tracking feature usage:', error);
-    }
-  } catch (err) {
-    console.error('Error in trackFeatureUsage:', err);
-  }
-};
-
-/**
- * Update user's storage usage (call after photo upload/delete)
- */
-export const updateStorageUsage = async (userId?: string) => {
-  try {
-    let uid = userId;
-    if (!uid) {
-      const { data: { user } } = await supabase.auth.getUser();
-      uid = user?.id;
-    }
-    if (!uid) return;
-
-    const { data: photos, error: photosError } = await supabase
-      .from('photos')
-      .select('size')
-      .eq('user_id', uid);
-
-    if (photosError) {
-      console.error('Error fetching photos for storage calculation:', photosError);
-      return;
-    }
-
-    const totalBytes = (photos || []).reduce((sum: number, p: any) => sum + (Number(p.size) || 0), 0);
-    const photoCount = (photos || []).length;
-
-    await supabase
-      .from('storage_usage')
-      .upsert({
-        user_id: uid,
-        total_bytes: totalBytes,
-        photo_count: photoCount,
-        last_updated: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
-  } catch (err) {
-    console.error('Error updating storage usage:', err);
+const trackFeatureUsage = (featureName: string) => {
+  if (import.meta.env.DEV) {
+    console.log('[Feature]', featureName);
   }
 };
 
@@ -134,7 +32,6 @@ export const updateStorageUsage = async (userId?: string) => {
 export const analytics = {
   // Core logging
   logActivity,
-  logError,
   trackFeatureUsage,
   
   // Photo actions
@@ -165,21 +62,18 @@ export const analytics = {
   
   // Feature usage
   featureUse: (featureName: string) => trackFeatureUsage(featureName),
-  // Storage
-  updateStorageUsage: updateStorageUsage,
 };
 
 /**
- * Track page/view events (call on navigation)
+ * Track page/view events
  */
-export const logPageView = (pageName: string, metadata?: Record<string, any>) => {
+export const logPageView = (pageName: string, metadata?: Record<string, unknown>) => {
   logActivity('page_view', 'page', undefined, { page: pageName, ...metadata });
 };
 
 /**
  * Helper: Log error in catch blocks
  */
-export const handleError = async (err: Error, component: string, metadata?: Record<string, any>) => {
+export const handleError = (err: Error, component: string, _metadata?: Record<string, unknown>) => {
   console.error(`Error in ${component}:`, err);
-  await logError(err, component, 'error', metadata);
 };
