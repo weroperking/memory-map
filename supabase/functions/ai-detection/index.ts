@@ -196,7 +196,8 @@ Return your analysis as JSON with this exact structure:
     });
   } catch (e) {
     console.error("Edge error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
