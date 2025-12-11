@@ -28,20 +28,20 @@ const premiumMetadataFields = [
 const plans = [
   {
     name: 'Monthly',
-    price: '$4.99',
+    price: '$7.99',
     period: '/month',
     popular: false,
   },
   {
     name: 'Yearly',
-    price: '$29.99',
+    price: '$47.99',
     period: '/year',
     popular: true,
     savings: 'Save 50%',
   },
   {
     name: 'Lifetime',
-    price: '$79.99',
+    price: '$119.99',
     period: 'one-time',
     popular: false,
   },
