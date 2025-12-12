@@ -1,9 +1,11 @@
-import { Check, Sparkles, X, Edit3, Package, Brain, Shield } from 'lucide-react';
+import { Check, Sparkles, X, Edit3, Package, Brain, Shield, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { analytics } from '@/lib/analytics';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -48,19 +50,40 @@ const plans = [
 ];
 
 export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModalProps) {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       analytics.upgradeView('modal');
     }
   }, [isOpen]);
 
-  const handleUpgrade = (plan: string) => {
-    const period = plans.find(p => p.name === plan)?.period || 'unknown';
-    analytics.upgradeComplete(plan, period);
-    if (onUpgradeComplete) {
-      onUpgradeComplete();
+  const handleUpgrade = async (plan: string) => {
+    try {
+      setLoadingPlan(plan);
+      
+      const { data, error } = await supabase.functions.invoke('creem-checkout', {
+        body: { plan }
+      });
+
+      if (error) {
+        console.error('Checkout error:', error);
+        toast.error('Failed to start checkout. Please try again.');
+        return;
+      }
+
+      if (data?.checkoutUrl) {
+        // Redirect to Creem checkout
+        window.location.href = data.checkoutUrl;
+      } else {
+        toast.error('Failed to get checkout URL');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      toast.error('An error occurred. Please try again.');
+    } finally {
+      setLoadingPlan(null);
     }
-    onClose();
   };
 
   return (
@@ -151,6 +174,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModa
                   </div>
                   <Button
                     onClick={() => handleUpgrade(plan.name)}
+                    disabled={loadingPlan !== null}
                     className={`mt-3 sm:mt-4 w-full text-sm ${
                       plan.popular
                         ? 'bg-chart-4 text-foreground hover:bg-chart-4/90'
@@ -158,7 +182,11 @@ export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModa
                     } border-2 border-foreground`}
                     variant={plan.popular ? 'default' : 'outline'}
                   >
-                    Choose {plan.name}
+                    {loadingPlan === plan.name ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                    ) : (
+                      `Choose ${plan.name}`
+                    )}
                   </Button>
                 </div>
               ))}
