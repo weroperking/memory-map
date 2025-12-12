@@ -60,6 +60,13 @@ export const analytics = {
   upgradeComplete: (plan: string, period: string) =>
     logActivity('upgrade_complete', 'subscription', undefined, { plan, period }),
   
+  // Payment events
+  paymentSuccess: (sessionId?: string | null) =>
+    logActivity('payment_success', 'payment', undefined, { session_id: sessionId }),
+  
+  paymentFailed: () =>
+    logActivity('payment_failed', 'payment'),
+  
   // Feature usage
   featureUse: (featureName: string) => trackFeatureUsage(featureName),
 };
