@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.creem-webhook]
 verify_jwt = false
+[auth.email]
+enable_confirmations = true
+site_url = "https://memorymap.lovable.app/"
+additional_redirect_urls = ["https://memorymap.lovable.app/auth/confirm"]
