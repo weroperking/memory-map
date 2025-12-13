@@ -192,9 +192,7 @@ export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModa
               ))}
             </div>
 
-            <p className="mt-4 sm:mt-6 text-center text-xs text-muted-foreground">
-              All plans include a 7-day money-back guarantee
-            </p>
+
           </div>
         </ScrollArea>
       </DialogContent>
