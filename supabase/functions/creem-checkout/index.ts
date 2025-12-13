@@ -55,7 +55,7 @@ serve(async (req) => {
     }
 
     // Get origin for redirect URLs
-    const origin = req.headers.get('origin') || 'https://zdebaejaqtyzmtxtnvgv.lovableproject.com';
+    const origin = req.headers.get('origin') || 'https://guutofptiuhxvpazpdyp.supabase.co';
 
     // Create Creem checkout session
     const checkoutPayload = {
