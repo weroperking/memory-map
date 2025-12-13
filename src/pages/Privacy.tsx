@@ -8,7 +8,7 @@ export default function Privacy() {
           <p className="text-muted-foreground mb-6 text-xs md:text-sm font-mono">LAST UPDATED: DECEMBER 2025</p>
 
           <p className="text-muted-foreground text-sm md:text-base mb-3">
-            Oryno LLC. ("Oryno," "we," "us," or "our") is a technology provider dedicated to empowering users
+            Oryno Inc. ("Oryno," "we," "us," or "our") is a technology provider dedicated to empowering users
             to ideate, build, and manage projects through our suite of digital tools. We are committed to ensuring
             compliance with applicable privacy laws in the jurisdictions where we operate.
           </p>
@@ -75,7 +75,7 @@ export default function Privacy() {
             <p className="text-muted-foreground text-sm md:text-base">We retain Personal Data only for as long as necessary to fulfill the purposes outlined in this Policy, or as required by law.</p>
             <ul className="list-disc list-inside text-muted-foreground mt-2">
               <li><strong>Active Accounts:</strong> Data is retained for the duration of your subscription.</li>
-              <li><strong>Deleted Accounts:</strong> Upon account termination, data acts are queued for deletion or anonymization within 90 days, retaining only what is necessary for tax and legal records.</li>
+              <li><strong>Deleted Accounts:</strong> Upon account termination, data assets are queued for deletion or anonymization within 90 days, retaining only what is necessary for tax and legal records.</li>
               <li><strong>Log Data:</strong> Technical logs are retained for a rolling period (typically up to 90 days) for security auditing.</li>
             </ul>
           </section>
