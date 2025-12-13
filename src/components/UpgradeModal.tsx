@@ -191,8 +191,6 @@ export function UpgradeModal({ isOpen, onClose, onUpgradeComplete }: UpgradeModa
                 </div>
               ))}
             </div>
-
-
           </div>
         </ScrollArea>
       </DialogContent>

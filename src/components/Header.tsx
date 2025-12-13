@@ -1,4 +1,5 @@
 import { MapPin, Image, Sparkles, Menu, Edit3, Package, Brain, User, LogOut, LogIn } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
@@ -135,6 +136,9 @@ export function Header({ activeView, onViewChange, onUpgrade }: HeaderProps) {
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-2 md:flex">
           <NavItems />
+          <Link to="/legal" className="px-3 py-1.5 border-2 border-foreground font-mono text-sm font-bold hover:bg-foreground/5 transition">
+            LEGAL
+          </Link>
           <div className="ml-4 h-8 w-px bg-foreground" />
           <GPSTipsDialog />
           
@@ -216,6 +220,9 @@ export function Header({ activeView, onViewChange, onUpgrade }: HeaderProps) {
               
               <NavItems />
               <GPSTipsDialog />
+              <Link to="/legal" onClick={() => setIsOpen(false)} className="px-3 py-1.5 border-2 border-foreground font-mono text-sm font-bold hover:bg-foreground/5 transition">
+                LEGAL
+              </Link>
               
               {!user ? (
                 <Button
